@@ -1,0 +1,32 @@
+[Unit]
+Description=Telegram Data Cleaner Service
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/telegram_data_cleaner
+User=root
+
+# Start command
+ExecStart=/usr/bin/docker-compose -f docker-compose.production.yml up -d
+
+# Stop command
+ExecStop=/usr/bin/docker-compose -f docker-compose.production.yml down
+
+# Reload command
+ExecReload=/usr/bin/docker-compose -f docker-compose.production.yml restart
+
+# Restart policy
+Restart=on-failure
+RestartSec=10s
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=telegram-data-cleaner
+
+[Install]
+WantedBy=multi-user.target

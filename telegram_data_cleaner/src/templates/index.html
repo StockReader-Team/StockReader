@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مدیریت دیکشنری نمادهای بورس</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap');
+        * { font-family: 'Vazirmatn', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0.75rem 1.5rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 500; transition: all 0.3s; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1.5rem; }
+        .upload-zone { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 3rem; text-align: center; cursor: pointer; transition: all 0.3s; }
+        .upload-zone:hover { border-color: #667eea; background: #f8f9ff; }
+        .upload-zone.dragover { border-color: #667eea; background: #f0f2ff; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f9fafb; padding: 0.75rem; text-align: right; font-weight: 600; border-bottom: 2px solid #e5e7eb; }
+        td { padding: 0.75rem; border-bottom: 1px solid #f3f4f6; }
+        tr:hover { background: #f9fafb; }
+        .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-info { background: #dbeafe; color: #1e40af; }
+        input[type="text"], select, textarea { border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.5rem 1rem; width: 100%; }
+        input[type="text"]:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; ring: 2px; ring-color: rgba(102, 126, 234, 0.3); }
+    </style>
+</head>
+<body class="bg-gray-50" x-data="dictionaryApp()" x-init="init()">
+    <!-- Header -->
+    <header class="gradient-bg shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-chart-line text-4xl text-white"></i>
+                    <div>
+                        <h1 class="text-3xl font-bold text-white">مدیریت دیکشنری و لغت‌نامه‌ها</h1>
+                        <p class="text-white/80 text-sm mt-1">مدیریت نمادهای بورس و لغت‌نامه‌های سفارشی</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="/matches" class="text-white hover:text-white/80 transition flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/10">
+                        <i class="fas fa-check-circle"></i>
+                        <span class="font-medium">تطابق‌ها</span>
+                    </a>
+                    <a href="/analytics" class="text-white hover:text-white/80 transition flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/10">
+                        <i class="fas fa-chart-line"></i>
+                        <span class="font-medium">آنالیتیکس</span>
+                    </a>
+                    <div class="text-white text-right border-r border-white/20 pr-6">
+                        <div class="text-2xl font-bold" x-text="symbols.length"></div>
+                        <div class="text-sm opacity-80">نماد بورسی</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="container mx-auto px-4 pt-6">
+        <div class="bg-white rounded-lg shadow p-2 flex gap-2">
+            <button @click="currentTab = 'symbols'" :class="currentTab === 'symbols' ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' : 'hover:bg-gray-100'" class="px-6 py-3 rounded-lg font-medium transition">
+                <i class="fas fa-chart-line ml-2"></i> نمادهای بورس
+            </button>
+            <button @click="currentTab = 'dictionaries'; loadOtherDictionaries()" :class="currentTab === 'dictionaries' ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' : 'hover:bg-gray-100'" class="px-6 py-3 rounded-lg font-medium transition">
+                <i class="fas fa-book ml-2"></i> لغت‌نامه‌ها
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-6">
+        <!-- Symbols Tab -->
+        <div x-show="currentTab === 'symbols'">
+        <!-- Upload Section -->
+        <div class="card mb-6">
+            <h2 class="text-2xl font-bold mb-4">
+                <i class="fas fa-file-excel text-green-600 ml-2"></i>
+                آپلود فایل Excel
+            </h2>
+
+            <div class="bg-blue-50 border-r-4 border-blue-500 p-4 rounded-lg mb-6">
+                <h3 class="font-bold text-blue-900 mb-2">
+                    <i class="fas fa-info-circle ml-2"></i>
+                    فرمت فایل Excel:
+                </h3>
+                <p class="text-sm text-gray-700 mb-2">فایل Excel شما باید شامل سه ستون باشد:</p>
+                <div class="grid md:grid-cols-3 gap-4 mt-3">
+                    <div class="bg-white p-3 rounded border-r-2 border-blue-400">
+                        <div class="font-bold text-blue-900">ستون 1: نماد</div>
+                        <div class="text-xs text-gray-600 mt-1">مثال: فولاد، شپنا، خودرو</div>
+                    </div>
+                    <div class="bg-white p-3 rounded border-r-2 border-green-400">
+                        <div class="font-bold text-green-900">ستون 2: صنعت</div>
+                        <div class="text-xs text-gray-600 mt-1">مثال: فلزات اساسی، پالایشگاه</div>
+                    </div>
+                    <div class="bg-white p-3 rounded border-r-2 border-purple-400">
+                        <div class="font-bold text-purple-900">ستون 3: نام شرکت</div>
+                        <div class="text-xs text-gray-600 mt-1">مثال: فولاد مبارکه اصفهان</div>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-600 mt-3">
+                    <i class="fas fa-lightbulb text-yellow-600 ml-1"></i>
+                    ردیف اول Excel باید عنوان ستون‌ها باشد و از ردیف دوم اطلاعات نمادها شروع می‌شود
+                </p>
+            </div>
+
+            <!-- Upload Zone -->
+            <div class="upload-zone"
+                 @dragover.prevent="dragover = true"
+                 @dragleave.prevent="dragover = false"
+                 @drop.prevent="handleDrop($event)"
+                 :class="{'dragover': dragover}"
+                 @click="$refs.fileInput.click()">
+
+                <input type="file"
+                       x-ref="fileInput"
+                       @change="handleFileSelect($event)"
+                       accept=".xlsx,.xls,.csv"
+                       class="hidden">
+
+                <div x-show="!selectedFile">
+                    <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
+                    <p class="text-xl text-gray-600 mb-2">فایل Excel را اینجا بکشید یا کلیک کنید</p>
+                    <p class="text-sm text-gray-500">فرمت‌های پشتیبانی شده: .xlsx, .xls, .csv</p>
+                </div>
+
+                <div x-show="selectedFile" class="text-center">
+                    <i class="fas fa-file-excel text-6xl text-green-600 mb-4"></i>
+                    <p class="text-lg font-bold text-gray-800" x-text="selectedFile?.name"></p>
+                    <p class="text-sm text-gray-500 mt-2" x-show="previewData.length > 0">
+                        <span x-text="previewData.length"></span> نماد در فایل یافت شد
+                    </p>
+                </div>
+            </div>
+
+            <!-- Preview Table -->
+            <div x-show="previewData.length > 0" class="mt-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold">
+                        <i class="fas fa-eye ml-2"></i>
+                        پیش‌نمایش (<span x-text="Math.min(5, previewData.length)"></span> نماد اول)
+                    </h3>
+                    <div class="flex gap-3">
+                        <button @click="selectedFile = null; previewData = []"
+                                class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            <i class="fas fa-times ml-2"></i>
+                            انصراف
+                        </button>
+                        <button @click="uploadData()"
+                                class="btn-primary"
+                                :disabled="uploading">
+                            <i class="fas fa-upload ml-2" :class="{'fa-spin': uploading}"></i>
+                            <span x-text="uploading ? 'در حال آپلود...' : 'آپلود و ذخیره'"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto border rounded-lg">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ردیف</th>
+                                <th>نماد</th>
+                                <th>صنعت</th>
+                                <th>نام شرکت</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(item, index) in previewData.slice(0, 5)" :key="index">
+                                <tr>
+                                    <td x-text="index + 1"></td>
+                                    <td><span class="font-bold text-blue-600" x-text="item.symbol"></span></td>
+                                    <td x-text="item.industry"></td>
+                                    <td x-text="item.company"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div x-show="previewData.length > 5" class="text-center mt-3 text-sm text-gray-500">
+                    ... و <span x-text="previewData.length - 5"></span> نماد دیگر
+                </div>
+            </div>
+
+            <!-- Upload Result -->
+            <div x-show="uploadResult"
+                 class="mt-6 p-4 rounded-lg"
+                 :class="uploadResult?.success ? 'bg-green-100 border-r-4 border-green-500' : 'bg-red-100 border-r-4 border-red-500'">
+                <div class="flex items-start gap-3">
+                    <i class="fas text-xl mt-1"
+                       :class="uploadResult?.success ? 'fa-check-circle text-green-600' : 'fa-exclamation-circle text-red-600'"></i>
+                    <div class="flex-1">
+                        <p class="font-bold mb-1"
+                           :class="uploadResult?.success ? 'text-green-900' : 'text-red-900'"
+                           x-text="uploadResult?.message"></p>
+                        <p x-show="uploadResult?.success" class="text-sm text-green-800">
+                            تعداد نمادهای جدید: <span class="font-bold" x-text="uploadResult?.count"></span>
+                        </p>
+                    </div>
+                    <button @click="uploadResult = null; selectedFile = null; previewData = []; loadSymbols()"
+                            class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search & Symbols List -->
+        <div class="card">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">
+                    <i class="fas fa-list ml-2"></i>
+                    لیست نمادها
+                </h2>
+                <div class="flex gap-3 items-center">
+                    <input type="text"
+                           x-model="searchQuery"
+                           @input="filterSymbols()"
+                           placeholder="جستجو در نمادها..."
+                           class="w-64">
+                    <span class="text-sm text-gray-500">
+                        <span x-text="filteredSymbols.length"></span> نماد
+                    </span>
+                </div>
+            </div>
+
+            <div x-show="symbols.length === 0" class="text-center py-12">
+                <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500 text-lg">هنوز نمادی آپلود نشده است</p>
+                <p class="text-gray-400 text-sm mt-2">فایل Excel خود را آپلود کنید</p>
+            </div>
+
+            <div x-show="symbols.length > 0" class="overflow-x-auto">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ردیف</th>
+                            <th>نماد</th>
+                            <th>صنعت</th>
+                            <th>نام شرکت</th>
+                            <th>وضعیت</th>
+                            <th>عملیات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="(symbol, index) in paginatedSymbols" :key="symbol.id">
+                            <tr>
+                                <td x-text="(currentPage * pageSize) + index + 1"></td>
+                                <td>
+                                    <span class="font-bold text-lg text-blue-600" x-text="symbol.word"></span>
+                                </td>
+                                <td>
+                                    <span class="badge badge-info" x-text="symbol.extra_data?.industry_name || '-'"></span>
+                                </td>
+                                <td x-text="symbol.extra_data?.company_name || '-'"></td>
+                                <td>
+                                    <span class="badge badge-success" x-show="symbol.is_active">
+                                        <i class="fas fa-check ml-1"></i> فعال
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="flex gap-2 justify-center">
+                                        <button @click="editSymbol(symbol)"
+                                                class="text-blue-600 hover:text-blue-800"
+                                                title="ویرایش">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button @click="deleteSymbol(symbol.id)"
+                                                class="text-red-600 hover:text-red-800"
+                                                title="حذف">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+
+                <!-- Pagination -->
+                <div class="mt-6 flex justify-center items-center gap-2" x-show="totalPages > 1">
+                    <button @click="currentPage = 0"
+                            :disabled="currentPage === 0"
+                            class="px-3 py-1 border rounded disabled:opacity-50">
+                        <i class="fas fa-angle-double-right"></i>
+                    </button>
+                    <button @click="currentPage--"
+                            :disabled="currentPage === 0"
+                            class="px-3 py-1 border rounded disabled:opacity-50">
+                        <i class="fas fa-angle-right"></i>
+                    </button>
+                    <span class="px-4 py-1">
+                        صفحه <span x-text="currentPage + 1"></span> از <span x-text="totalPages"></span>
+                    </span>
+                    <button @click="currentPage++"
+                            :disabled="currentPage >= totalPages - 1"
+                            class="px-3 py-1 border rounded disabled:opacity-50">
+                        <i class="fas fa-angle-left"></i>
+                    </button>
+                    <button @click="currentPage = totalPages - 1"
+                            :disabled="currentPage >= totalPages - 1"
+                            class="px-3 py-1 border rounded disabled:opacity-50">
+                        <i class="fas fa-angle-double-left"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- Dictionaries Tab -->
+        <div x-show="currentTab === 'dictionaries'" class="space-y-6">
+            <!-- Dictionary Management Section -->
+            <div class="card">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">
+                        <i class="fas fa-book ml-2"></i>
+                        لغت‌نامه‌ها
+                    </h2>
+                    <button @click="showDictModal = true" class="btn-primary">
+                        <i class="fas fa-plus ml-2"></i>
+                        لغت‌نامه جدید
+                    </button>
+                </div>
+
+                <div x-show="otherDicts.length === 0" class="text-center py-12">
+                    <i class="fas fa-book text-6xl text-gray-300 mb-4"></i>
+                    <p class="text-gray-500">هنوز لغت‌نامه‌ای ایجاد نکرده‌اید</p>
+                </div>
+
+                <div x-show="otherDicts.length > 0" class="grid md:grid-cols-2 gap-4">
+                    <template x-for="dict in otherDicts" :key="dict.id">
+                        <div class="border rounded-lg p-4 hover:shadow-md transition">
+                            <div class="flex justify-between items-start mb-3">
+                                <div class="flex-1">
+                                    <h3 class="font-bold text-lg" x-text="dict.name"></h3>
+                                    <p class="text-sm text-gray-600 mt-1" x-text="dict.description"></p>
+                                </div>
+                                <button @click="deleteDict(dict.id)" class="text-red-600 hover:text-red-800">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <div class="flex justify-between items-center gap-2">
+                                <div class="flex gap-3 text-sm text-gray-500">
+                                    <span>
+                                        <i class="fas fa-folder ml-1"></i>
+                                        <span x-text="dict.categoryCount || 0"></span> دسته
+                                    </span>
+                                    <span>
+                                        <i class="fas fa-tags ml-1"></i>
+                                        <span x-text="dict.wordCount || 0"></span> کلمه
+                                    </span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button @click="viewDictWords(dict)" class="text-green-600 hover:text-green-800 font-medium text-sm" title="کلمات">
+                                        <i class="fas fa-list"></i>
+                                    </button>
+                                    <button @click="viewDictCategories(dict)" class="text-blue-600 hover:text-blue-800 font-medium text-sm" title="دسته‌بندی‌ها">
+                                        <i class="fas fa-folder-tree"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Category Management (when a dictionary is selected) -->
+            <div x-show="selectedDict" class="card">
+                <button @click="selectedDict = null; selectedCategory = null" class="text-gray-500 hover:text-gray-700 mb-4">
+                    <i class="fas fa-arrow-right ml-1"></i> بازگشت
+                </button>
+
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold">
+                        <i class="fas fa-folder ml-2"></i>
+                        دسته‌بندی‌های <span x-text="selectedDict?.name"></span>
+                    </h2>
+                    <button @click="showCategoryModal = true" class="btn-primary">
+                        <i class="fas fa-plus ml-2"></i>
+                        دسته جدید
+                    </button>
+                </div>
+
+                <div x-show="dictCategories.length === 0" class="text-center py-8 text-gray-500">
+                    هنوز دسته‌ای ایجاد نشده
+                </div>
+
+                <div x-show="dictCategories.length > 0">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>نام دسته</th>
+                                <th>دسته مادر</th>
+                                <th>توضیحات</th>
+                                <th>تعداد کلمات</th>
+                                <th>عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="cat in dictCategories" :key="cat.id">
+                                <tr>
+                                    <td><span class="font-medium" x-text="cat.name"></span></td>
+                                    <td><span class="text-sm text-gray-600" x-text="cat.parent_name || '-'"></span></td>
+                                    <td><span class="text-sm" x-text="cat.description || '-'"></span></td>
+                                    <td><span class="badge badge-info" x-text="cat.wordCount || 0"></span></td>
+                                    <td>
+                                        <button @click="viewCategoryWords(cat)" class="text-blue-600 hover:text-blue-800 ml-3" title="کلمات">
+                                            <i class="fas fa-list"></i>
+                                        </button>
+                                        <button @click="deleteCategory(cat.id)" class="text-red-600 hover:text-red-800" title="حذف">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Words Management (when a category is selected) -->
+            <div x-show="selectedCategory" class="card">
+                <button @click="selectedCategory = null" class="text-gray-500 hover:text-gray-700 mb-4">
+                    <i class="fas fa-arrow-right ml-1"></i> بازگشت به دسته‌ها
+                </button>
+
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold">
+                        <i class="fas fa-tags ml-2"></i>
+                        کلمات دسته: <span x-text="selectedCategory?.name"></span>
+                    </h2>
+                    <button @click="showWordModal = true" class="btn-primary">
+                        <i class="fas fa-plus ml-2"></i>
+                        کلمه جدید
+                    </button>
+                </div>
+
+                <div x-show="categoryWords.length === 0" class="text-center py-8 text-gray-500">
+                    هنوز کلمه‌ای اضافه نشده
+                </div>
+
+                <div x-show="categoryWords.length > 0">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>کلمه</th>
+                                <th>کلمه نرمال شده</th>
+                                <th>وضعیت</th>
+                                <th>عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="word in categoryWords" :key="word.id">
+                                <tr>
+                                    <td><span class="font-bold text-blue-600" x-text="word.word"></span></td>
+                                    <td><span class="text-sm text-gray-600" x-text="word.normalized_word"></span></td>
+                                    <td>
+                                        <span class="badge badge-success" x-show="word.is_active">فعال</span>
+                                    </td>
+                                    <td>
+                                        <button @click="deleteWord(word.id)" class="text-red-600 hover:text-red-800">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Direct Words Management (without category) -->
+            <div x-show="selectedDictForWords && !selectedCategory" class="card">
+                <button @click="selectedDictForWords = null; directDictWords = []" class="text-gray-500 hover:text-gray-700 mb-4">
+                    <i class="fas fa-arrow-right ml-1"></i> بازگشت
+                </button>
+
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold">
+                        <i class="fas fa-tags ml-2"></i>
+                        کلمات لغت‌نامه: <span x-text="selectedDictForWords?.name"></span>
+                    </h2>
+                    <button @click="showDirectWordModal = true" class="btn-primary">
+                        <i class="fas fa-plus ml-2"></i>
+                        کلمه جدید
+                    </button>
+                </div>
+
+                <div x-show="directDictWords.length === 0" class="text-center py-8 text-gray-500">
+                    هنوز کلمه‌ای اضافه نشده
+                </div>
+
+                <div x-show="directDictWords.length > 0">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>کلمه</th>
+                                <th>کلمه نرمال شده</th>
+                                <th>دسته</th>
+                                <th>وضعیت</th>
+                                <th>عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="word in directDictWords" :key="word.id">
+                                <tr>
+                                    <td><span class="font-bold text-blue-600" x-text="word.word"></span></td>
+                                    <td><span class="text-sm text-gray-600" x-text="word.normalized_word"></span></td>
+                                    <td><span class="text-sm text-gray-500" x-text="word.category_name || '-'"></span></td>
+                                    <td>
+                                        <span class="badge badge-success" x-show="word.is_active">فعال</span>
+                                    </td>
+                                    <td>
+                                        <button @click="deleteDirectWord(word.id)" class="text-red-600 hover:text-red-800">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div x-show="showDictModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="showDictModal = false">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">لغت‌نامه جدید</h3>
+            <form @submit.prevent="createDict()">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">نام *</label>
+                        <input type="text" x-model="newDict.name" required placeholder="مثال: کلمات مثبت/منفی">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">توضیحات</label>
+                        <textarea x-model="newDict.description" rows="3" class="border rounded-lg p-2 w-full"></textarea>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" @click="showDictModal = false" class="px-4 py-2 border rounded-lg">انصراف</button>
+                    <button type="submit" class="btn-primary">ایجاد</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div x-show="showCategoryModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="showCategoryModal = false">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">دسته‌بندی جدید</h3>
+            <form @submit.prevent="createCategory()">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">نام *</label>
+                        <input type="text" x-model="newCategory.name" required placeholder="مثال: کلمات مثبت">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">دسته مادر (اختیاری)</label>
+                        <select x-model="newCategory.parent_id" class="border rounded-lg p-2 w-full">
+                            <option value="">بدون دسته مادر</option>
+                            <template x-for="cat in dictCategories" :key="cat.id">
+                                <option :value="cat.id" x-text="cat.name"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">توضیحات</label>
+                        <textarea x-model="newCategory.description" rows="3" class="border rounded-lg p-2 w-full"></textarea>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" @click="showCategoryModal = false" class="px-4 py-2 border rounded-lg">انصراف</button>
+                    <button type="submit" class="btn-primary">ایجاد</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div x-show="showWordModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="showWordModal = false">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">کلمه جدید</h3>
+            <form @submit.prevent="createWord()">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">کلمه *</label>
+                        <input type="text" x-model="newWord.word" required placeholder="مثال: عالی">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" @click="showWordModal = false" class="px-4 py-2 border rounded-lg">انصراف</button>
+                    <button type="submit" class="btn-primary">ایجاد</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div x-show="showDirectWordModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="showDirectWordModal = false">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">کلمه جدید</h3>
+            <form @submit.prevent="createDirectWord()">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">کلمه *</label>
+                        <input type="text" x-model="newDirectWord.word" required placeholder="مثال: عالی">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">دسته (اختیاری)</label>
+                        <select x-model="newDirectWord.category_id">
+                            <option value="">بدون دسته</option>
+                            <template x-for="cat in availableCategoriesForDirect" :key="cat.id">
+                                <option :value="cat.id" x-text="cat.name"></option>
+                            </template>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">اگر انتخاب نکنید، به دسته "عمومی" اضافه می‌شود</p>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" @click="showDirectWordModal = false" class="px-4 py-2 border rounded-lg">انصراف</button>
+                    <button type="submit" class="btn-primary">ایجاد</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Symbol Modal -->
+    <div x-show="showEditSymbolModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="showEditSymbolModal = false">
+        <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-xl font-bold mb-4">ویرایش نماد</h3>
+            <form @submit.prevent="updateSymbol()">
+                <div class="space-y-4">
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">نماد *</label>
+                            <input type="text" x-model="editingSymbol.word" required placeholder="مثال: فولاد">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">نام شرکت</label>
+                            <input type="text" x-model="editingSymbol.company_name" placeholder="مثال: فولاد مبارکه اصفهان">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">صنعت</label>
+                        <input type="text" x-model="editingSymbol.industry_name" placeholder="مثال: فلزات اساسی">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">کلمات کلیدی اضافی</label>
+                        <p class="text-xs text-gray-500 mb-2">برای matching بهتر، کلمات مرتبط با این نماد را وارد کنید (هر کلمه در یک خط)</p>
+                        <textarea x-model="editingSymbol.keywords_text"
+                                  rows="4"
+                                  class="w-full border rounded-lg p-2"
+                                  placeholder="مثال:&#10;مبارکه&#10;اصفهان&#10;فولاد مبارکه"></textarea>
+                        <p class="text-xs text-gray-400 mt-1">این کلمات در matching استفاده می‌شوند</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" x-model="editingSymbol.is_active" id="edit-is-active">
+                        <label for="edit-is-active" class="text-sm">فعال</label>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" @click="showEditSymbolModal = false" class="px-4 py-2 border rounded-lg">انصراف</button>
+                    <button type="submit" class="btn-primary">ذخیره تغییرات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function dictionaryApp() {
+            return {
+                // Tab management
+                currentTab: 'symbols',
+
+                // Symbols data
+                symbols: [],
+                filteredSymbols: [],
+                searchQuery: '',
+                currentPage: 0,
+                pageSize: 20,
+
+                selectedFile: null,
+                previewData: [],
+                dragover: false,
+                uploading: false,
+                uploadResult: null,
+
+                dictionaryId: null,
+                categoryId: null,
+
+                // Dictionary management
+                otherDicts: [],
+                selectedDict: null,
+                dictCategories: [],
+                selectedCategory: null,
+                categoryWords: [],
+
+                // Direct word management (without category selection)
+                selectedDictForWords: null,
+                directDictWords: [],
+                availableCategoriesForDirect: [],
+                defaultCategoryId: null,
+
+                // Modals
+                showDictModal: false,
+                showCategoryModal: false,
+                showWordModal: false,
+                showDirectWordModal: false,
+                showEditSymbolModal: false,
+
+                // Forms
+                newDict: { name: '', description: '' },
+                newCategory: { name: '', parent_id: '', description: '' },
+                newWord: { word: '' },
+                newDirectWord: { word: '', category_id: '' },
+                editingSymbol: {
+                    id: null,
+                    word: '',
+                    company_name: '',
+                    industry_name: '',
+                    keywords_text: '',
+                    is_active: true
+                },
+
+                async init() {
+                    await this.ensureDictionaryAndCategory();
+                    await this.loadSymbols();
+                },
+
+                async ensureDictionaryAndCategory() {
+                    try {
+                        // Check if dictionary exists
+                        let res = await fetch('/api/dictionary/dictionaries');
+                        let dicts = await res.json();
+                        let dict = dicts.find(d => d.name === 'نمادهای بورس');
+
+                        if (!dict) {
+                            // Create dictionary
+                            res = await fetch('/api/dictionary/dictionaries', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    name: 'نمادهای بورس',
+                                    description: 'دیکشنری نمادهای بورس اوراق بهادار تهران',
+                                    is_active: true
+                                })
+                            });
+                            dict = await res.json();
+                        }
+                        this.dictionaryId = dict.id;
+
+                        // Check if category exists
+                        res = await fetch(`/api/dictionary/categories?dictionary_id=${this.dictionaryId}`);
+                        let cats = await res.json();
+                        let cat = cats.find(c => c.name === 'نمادها');
+
+                        if (!cat) {
+                            // Create category
+                            res = await fetch('/api/dictionary/categories', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    dictionary_id: this.dictionaryId,
+                                    name: 'نمادها',
+                                    description: 'نمادهای معاملاتی'
+                                })
+                            });
+                            cat = await res.json();
+                        }
+                        this.categoryId = cat.id;
+                    } catch (e) {
+                        console.error('Error ensuring dictionary:', e);
+                    }
+                },
+
+                async loadSymbols() {
+                    try {
+                        if (!this.categoryId) return;
+                        const res = await fetch(`/api/dictionary/words?category_id=${this.categoryId}`);
+                        if (res.ok) {
+                            this.symbols = await res.json();
+                            this.filterSymbols();
+                        }
+                    } catch (e) {
+                        console.error('Error loading symbols:', e);
+                    }
+                },
+
+                handleFileSelect(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        this.selectedFile = file;
+                        this.parseExcel(file);
+                    }
+                },
+
+                handleDrop(event) {
+                    this.dragover = false;
+                    const file = event.dataTransfer.files[0];
+                    if (file) {
+                        this.selectedFile = file;
+                        this.parseExcel(file);
+                    }
+                },
+
+                parseExcel(file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+                            // Parse data (skip header row)
+                            this.previewData = jsonData.slice(1)
+                                .filter(row => row[0]) // Filter empty rows
+                                .map(row => ({
+                                    symbol: row[0]?.toString().trim(),
+                                    industry: row[1]?.toString().trim() || '',
+                                    company: row[2]?.toString().trim() || ''
+                                }))
+                                .filter(item => item.symbol); // Remove items without symbol
+
+                        } catch (error) {
+                            alert('خطا در خواندن فایل: ' + error.message);
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                },
+
+                async uploadData() {
+                    if (!this.categoryId || this.previewData.length === 0) return;
+
+                    this.uploading = true;
+                    this.uploadResult = null;
+
+                    try {
+                        let successCount = 0;
+
+                        for (const item of this.previewData) {
+                            const payload = {
+                                category_id: this.categoryId,
+                                word: item.symbol,
+                                is_active: true,
+                                extra_data: {
+                                    symbol_name: item.symbol,
+                                    industry_name: item.industry,
+                                    company_name: item.company
+                                }
+                            };
+
+                            const res = await fetch('/api/dictionary/words', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+
+                            if (res.ok) successCount++;
+                        }
+
+                        this.uploadResult = {
+                            success: true,
+                            message: 'آپلود با موفقیت انجام شد!',
+                            count: successCount
+                        };
+
+                    } catch (error) {
+                        this.uploadResult = {
+                            success: false,
+                            message: 'خطا در آپلود: ' + error.message
+                        };
+                    } finally {
+                        this.uploading = false;
+                    }
+                },
+
+                filterSymbols() {
+                    if (!this.searchQuery) {
+                        this.filteredSymbols = this.symbols;
+                    } else {
+                        const query = this.searchQuery.toLowerCase();
+                        this.filteredSymbols = this.symbols.filter(s =>
+                            s.word.toLowerCase().includes(query) ||
+                            s.extra_data?.company_name?.toLowerCase().includes(query) ||
+                            s.extra_data?.industry_name?.toLowerCase().includes(query)
+                        );
+                    }
+                    this.currentPage = 0;
+                },
+
+                async deleteSymbol(id) {
+                    if (!confirm('آیا از حذف این نماد مطمئن هستید؟')) return;
+
+                    try {
+                        await fetch(`/api/dictionary/words/${id}`, { method: 'DELETE' });
+                        await this.loadSymbols();
+                    } catch (e) {
+                        alert('خطا در حذف');
+                    }
+                },
+
+                editSymbol(symbol) {
+                    // Populate form with existing data
+                    this.editingSymbol.id = symbol.id;
+                    this.editingSymbol.word = symbol.word;
+                    this.editingSymbol.company_name = symbol.extra_data?.company_name || '';
+                    this.editingSymbol.industry_name = symbol.extra_data?.industry_name || '';
+                    this.editingSymbol.is_active = symbol.is_active;
+
+                    // Convert keywords array to text (each keyword on new line)
+                    const keywords = symbol.extra_data?.keywords || [];
+                    this.editingSymbol.keywords_text = keywords.join('\n');
+
+                    this.showEditSymbolModal = true;
+                },
+
+                async updateSymbol() {
+                    try {
+                        // Convert keywords text to array
+                        const keywords = this.editingSymbol.keywords_text
+                            .split('\n')
+                            .map(k => k.trim())
+                            .filter(k => k.length > 0);
+
+                        // Prepare update data
+                        const updateData = {
+                            word: this.editingSymbol.word,
+                            is_active: this.editingSymbol.is_active,
+                            extra_data: {
+                                symbol_name: this.editingSymbol.word,
+                                company_name: this.editingSymbol.company_name,
+                                industry_name: this.editingSymbol.industry_name,
+                                keywords: keywords
+                            }
+                        };
+
+                        const res = await fetch(`/api/dictionary/words/${this.editingSymbol.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(updateData)
+                        });
+
+                        if (!res.ok) {
+                            throw new Error('خطا در ویرایش نماد');
+                        }
+
+                        // Close modal and reload symbols
+                        this.showEditSymbolModal = false;
+                        await this.loadSymbols();
+
+                        // Reset form
+                        this.editingSymbol = {
+                            id: null,
+                            word: '',
+                            company_name: '',
+                            industry_name: '',
+                            keywords_text: '',
+                            is_active: true
+                        };
+                    } catch (e) {
+                        alert('خطا در ویرایش نماد: ' + e.message);
+                    }
+                },
+
+                // Dictionary Management Functions
+                async loadOtherDictionaries() {
+                    try {
+                        const res = await fetch('/api/dictionary/dictionaries');
+                        const allDicts = await res.json();
+                        this.otherDicts = allDicts.filter(d => d.name !== 'نمادهای بورس');
+
+                        // Load category counts and word counts for each dictionary
+                        for (let dict of this.otherDicts) {
+                            const catRes = await fetch(`/api/dictionary/categories?dictionary_id=${dict.id}`);
+                            const cats = await catRes.json();
+                            dict.categoryCount = cats.length;
+
+                            // Count all words in all categories
+                            let totalWords = 0;
+                            for (let cat of cats) {
+                                const wordsRes = await fetch(`/api/dictionary/words?category_id=${cat.id}`);
+                                const words = await wordsRes.json();
+                                totalWords += words.length;
+                            }
+                            dict.wordCount = totalWords;
+                        }
+                    } catch (e) {
+                        console.error('Error loading dictionaries:', e);
+                    }
+                },
+
+                async createDict() {
+                    try {
+                        const res = await fetch('/api/dictionary/dictionaries', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.newDict)
+                        });
+                        if (res.ok) {
+                            await this.loadOtherDictionaries();
+                            this.showDictModal = false;
+                            this.newDict = { name: '', description: '' };
+                        } else {
+                            alert('خطا در ایجاد لغت‌نامه');
+                        }
+                    } catch (e) {
+                        alert('خطا: ' + e.message);
+                    }
+                },
+
+                async deleteDict(id) {
+                    if (!confirm('آیا از حذف این لغت‌نامه مطمئن هستید؟')) return;
+                    try {
+                        await fetch(`/api/dictionary/dictionaries/${id}`, { method: 'DELETE' });
+                        await this.loadOtherDictionaries();
+                    } catch (e) {
+                        alert('خطا در حذف');
+                    }
+                },
+
+                async viewDictCategories(dict) {
+                    try {
+                        this.selectedDict = dict;
+                        this.selectedCategory = null;
+                        const res = await fetch(`/api/dictionary/categories?dictionary_id=${dict.id}`);
+                        this.dictCategories = await res.json();
+
+                        // Add parent names and word counts
+                        for (let cat of this.dictCategories) {
+                            if (cat.parent_id) {
+                                const parent = this.dictCategories.find(c => c.id === cat.parent_id);
+                                cat.parent_name = parent?.name;
+                            }
+                            const wordsRes = await fetch(`/api/dictionary/words?category_id=${cat.id}`);
+                            const words = await wordsRes.json();
+                            cat.wordCount = words.length;
+                        }
+                    } catch (e) {
+                        console.error('Error loading categories:', e);
+                    }
+                },
+
+                async createCategory() {
+                    try {
+                        const payload = {
+                            dictionary_id: this.selectedDict.id,
+                            name: this.newCategory.name,
+                            description: this.newCategory.description,
+                            parent_id: this.newCategory.parent_id || null
+                        };
+                        const res = await fetch('/api/dictionary/categories', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (res.ok) {
+                            await this.viewDictCategories(this.selectedDict);
+                            this.showCategoryModal = false;
+                            this.newCategory = { name: '', parent_id: '', description: '' };
+                        } else {
+                            alert('خطا در ایجاد دسته‌بندی');
+                        }
+                    } catch (e) {
+                        alert('خطا: ' + e.message);
+                    }
+                },
+
+                async deleteCategory(id) {
+                    if (!confirm('آیا از حذف این دسته مطمئن هستید؟')) return;
+                    try {
+                        await fetch(`/api/dictionary/categories/${id}`, { method: 'DELETE' });
+                        await this.viewDictCategories(this.selectedDict);
+                    } catch (e) {
+                        alert('خطا در حذف');
+                    }
+                },
+
+                async viewCategoryWords(cat) {
+                    try {
+                        this.selectedCategory = cat;
+                        const res = await fetch(`/api/dictionary/words?category_id=${cat.id}`);
+                        this.categoryWords = await res.json();
+                    } catch (e) {
+                        console.error('Error loading words:', e);
+                    }
+                },
+
+                async createWord() {
+                    try {
+                        const payload = {
+                            category_id: this.selectedCategory.id,
+                            word: this.newWord.word,
+                            is_active: true
+                        };
+                        const res = await fetch('/api/dictionary/words', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (res.ok) {
+                            await this.viewCategoryWords(this.selectedCategory);
+                            this.showWordModal = false;
+                            this.newWord = { word: '' };
+                        } else {
+                            alert('خطا در ایجاد کلمه');
+                        }
+                    } catch (e) {
+                        alert('خطا: ' + e.message);
+                    }
+                },
+
+                async deleteWord(id) {
+                    if (!confirm('آیا از حذف این کلمه مطمئن هستید؟')) return;
+                    try {
+                        await fetch(`/api/dictionary/words/${id}`, { method: 'DELETE' });
+                        await this.viewCategoryWords(this.selectedCategory);
+                    } catch (e) {
+                        alert('خطا در حذف');
+                    }
+                },
+
+                // Direct word management (without category selection)
+                async viewDictWords(dict) {
+                    try {
+                        this.selectedDictForWords = dict;
+                        this.selectedDict = null;
+                        this.selectedCategory = null;
+
+                        // Load all categories for this dictionary
+                        const catRes = await fetch(`/api/dictionary/categories?dictionary_id=${dict.id}`);
+                        this.availableCategoriesForDirect = await catRes.json();
+
+                        // Find or create default "عمومی" category
+                        let defaultCat = this.availableCategoriesForDirect.find(c => c.name === 'عمومی');
+                        if (!defaultCat) {
+                            const res = await fetch('/api/dictionary/categories', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    dictionary_id: dict.id,
+                                    name: 'عمومی',
+                                    description: 'دسته پیش‌فرض'
+                                })
+                            });
+                            if (res.ok) {
+                                defaultCat = await res.json();
+                                this.availableCategoriesForDirect.push(defaultCat);
+                            }
+                        }
+                        this.defaultCategoryId = defaultCat?.id;
+
+                        // Load all words from all categories
+                        this.directDictWords = [];
+                        for (let cat of this.availableCategoriesForDirect) {
+                            const wordsRes = await fetch(`/api/dictionary/words?category_id=${cat.id}`);
+                            const words = await wordsRes.json();
+                            // Add category name to each word
+                            words.forEach(w => {
+                                w.category_name = cat.name;
+                                this.directDictWords.push(w);
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Error loading dictionary words:', e);
+                    }
+                },
+
+                async createDirectWord() {
+                    try {
+                        const categoryId = this.newDirectWord.category_id || this.defaultCategoryId;
+                        if (!categoryId) {
+                            alert('خطا: دسته پیش‌فرض یافت نشد');
+                            return;
+                        }
+
+                        const payload = {
+                            category_id: categoryId,
+                            word: this.newDirectWord.word,
+                            is_active: true
+                        };
+                        const res = await fetch('/api/dictionary/words', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (res.ok) {
+                            await this.viewDictWords(this.selectedDictForWords);
+                            this.showDirectWordModal = false;
+                            this.newDirectWord = { word: '', category_id: '' };
+                        } else {
+                            alert('خطا در ایجاد کلمه');
+                        }
+                    } catch (e) {
+                        alert('خطا: ' + e.message);
+                    }
+                },
+
+                async deleteDirectWord(id) {
+                    if (!confirm('آیا از حذف این کلمه مطمئن هستید؟')) return;
+                    try {
+                        await fetch(`/api/dictionary/words/${id}`, { method: 'DELETE' });
+                        await this.viewDictWords(this.selectedDictForWords);
+                    } catch (e) {
+                        alert('خطا در حذف');
+                    }
+                },
+
+                get paginatedSymbols() {
+                    const start = this.currentPage * this.pageSize;
+                    return this.filteredSymbols.slice(start, start + this.pageSize);
+                },
+
+                get totalPages() {
+                    return Math.ceil(this.filteredSymbols.length / this.pageSize);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

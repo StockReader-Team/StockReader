@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مدیریت دیکشنری نمادهای بورس</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap');
+        * { font-family: 'Vazirmatn', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0.75rem 1.5rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 500; transition: all 0.3s; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1.5rem; }
+        .upload-zone { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 3rem; text-align: center; cursor: pointer; transition: all 0.3s; }
+        .upload-zone:hover { border-color: #667eea; background: #f8f9ff; }
+        .upload-zone.dragover { border-color: #667eea; background: #f0f2ff; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f9fafb; padding: 0.75rem; text-align: right; font-weight: 600; border-bottom: 2px solid #e5e7eb; }
+        td { padding: 0.75rem; border-bottom: 1px solid #f3f4f6; }
+        tr:hover { background: #f9fafb; }
+        .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-info { background: #dbeafe; color: #1e40af; }
+        input[type="text"] { border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.5rem 1rem; width: 100%; }
+        input[type="text"]:focus { outline: none; border-color: #667eea; ring: 2px; ring-color: rgba(102, 126, 234, 0.3); }
+    </style>
+</head>
+<body class="bg-gray-50" x-data="dictionaryApp()" x-init="init()">
+    <!-- Header -->
+    <header class="gradient-bg shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-chart-line text-4xl text-white"></i>
+                    <div>
+                        <h1 class="text-3xl font-bold text-white">مدیریت دیکشنری نمادهای بورس</h1>
+                        <p class="text-white/80 text-sm mt-1">آپلود و مدیریت نمادهای بورس اوراق بهادار</p>
+                    </div>
+                </div>
+                <div class="text-white text-right">
+                    <div class="text-2xl font-bold" x-text="symbols.length"></div>
+                    <div class="text-sm opacity-80">نماد ثبت شده</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- Upload Section -->
+        <div class="card mb-6">
+            <h2 class="text-2xl font-bold mb-4">
+                <i class="fas fa-file-excel text-green-600 ml-2"></i>
+                آپلود فایل Excel
+            </h2>
+
+            <div class="bg-blue-50 border-r-4 border-blue-500 p-4 rounded-lg mb-6">
+                <h3 class="font-bold text-blue-900 mb-2">
+                    <i class="fas fa-info-circle ml-2"></i>
+                    فرمت فایل Excel:
+                </h3>
+                <p class="text-sm text-gray-700 mb-2">فایل Excel شما باید شامل سه ستون باشد:</p>
+                <div class="grid md:grid-cols-3 gap-4 mt-3">
+                    <div class="bg-white p-3 rounded border-r-2 border-blue-400">
+                        <div class="font-bold text-blue-900">ستون 1: نماد</div>
+                        <div class="text-xs text-gray-600 mt-1">مثال: فولاد، شپنا، خودرو</div>
+                    </div>
+                    <div class="bg-white p-3 rounded border-r-2 border-green-400">
+                        <div class="font-bold text-green-900">ستون 2: صنعت</div>
+                        <div class="text-xs text-gray-600 mt-1">مثال: فلزات اساسی، پالایشگاه</div>
+                    </div>
+                    <div class="bg-white p-3 rounded border-r-2 border-purple-400">
+                        <div class="font-bold text-purple-900">ستون 3: نام شرکت</div>
+                        <div class="text-xs text-gray-600 mt-1">مثال: فولاد مبارکه اصفهان</div>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-600 mt-3">
+                    <i class="fas fa-lightbulb text-yellow-600 ml-1"></i>
+                    ردیف اول Excel باید عنوان ستون‌ها باشد و از ردیف دوم اطلاعات نمادها شروع می‌شود
+                </p>
+            </div>
+
+            <!-- Upload Zone -->
+            <div class="upload-zone"
+                 @dragover.prevent="dragover = true"
+                 @dragleave.prevent="dragover = false"
+                 @drop.prevent="handleDrop($event)"
+                 :class="{'dragover': dragover}"
+                 @click="$refs.fileInput.click()">
+
+                <input type="file"
+                       x-ref="fileInput"
+                       @change="handleFileSelect($event)"
+                       accept=".xlsx,.xls,.csv"
+                       class="hidden">
+
+                <div x-show="!selectedFile">
+                    <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
+                    <p class="text-xl text-gray-600 mb-2">فایل Excel را اینجا بکشید یا کلیک کنید</p>
+                    <p class="text-sm text-gray-500">فرمت‌های پشتیبانی شده: .xlsx, .xls, .csv</p>
+                </div>
+
+                <div x-show="selectedFile" class="text-center">
+                    <i class="fas fa-file-excel text-6xl text-green-600 mb-4"></i>
+                    <p class="text-lg font-bold text-gray-800" x-text="selectedFile?.name"></p>
+                    <p class="text-sm text-gray-500 mt-2" x-show="previewData.length > 0">
+                        <span x-text="previewData.length"></span> نماد در فایل یافت شد
+                    </p>
+                </div>
+            </div>
+
+            <!-- Preview Table -->
+            <div x-show="previewData.length > 0" class="mt-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold">
+                        <i class="fas fa-eye ml-2"></i>
+                        پیش‌نمایش (<span x-text="Math.min(5, previewData.length)"></span> نماد اول)
+                    </h3>
+                    <div class="flex gap-3">
+                        <button @click="selectedFile = null; previewData = []"
+                                class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            <i class="fas fa-times ml-2"></i>
+                            انصراف
+                        </button>
+                        <button @click="uploadData()"
+                                class="btn-primary"
+                                :disabled="uploading">
+                            <i class="fas fa-upload ml-2" :class="{'fa-spin': uploading}"></i>
+                            <span x-text="uploading ? 'در حال آپلود...' : 'آپلود و ذخیره'"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto border rounded-lg">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ردیف</th>
+                                <th>نماد</th>
+                                <th>صنعت</th>
+                                <th>نام شرکت</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(item, index) in previewData.slice(0, 5)" :key="index">
+                                <tr>
+                                    <td x-text="index + 1"></td>
+                                    <td><span class="font-bold text-blue-600" x-text="item.symbol"></span></td>
+                                    <td x-text="item.industry"></td>
+                                    <td x-text="item.company"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div x-show="previewData.length > 5" class="text-center mt-3 text-sm text-gray-500">
+                    ... و <span x-text="previewData.length - 5"></span> نماد دیگر
+                </div>
+            </div>
+
+            <!-- Upload Result -->
+            <div x-show="uploadResult"
+                 class="mt-6 p-4 rounded-lg"
+                 :class="uploadResult?.success ? 'bg-green-100 border-r-4 border-green-500' : 'bg-red-100 border-r-4 border-red-500'">
+                <div class="flex items-start gap-3">
+                    <i class="fas text-xl mt-1"
+                       :class="uploadResult?.success ? 'fa-check-circle text-green-600' : 'fa-exclamation-circle text-red-600'"></i>
+                    <div class="flex-1">
+                        <p class="font-bold mb-1"
+                           :class="uploadResult?.success ? 'text-green-900' : 'text-red-900'"
+                           x-text="uploadResult?.message"></p>
+                        <p x-show="uploadResult?.success" class="text-sm text-green-800">
+                            تعداد نمادهای جدید: <span class="font-bold" x-text="uploadResult?.count"></span>
+                        </p>
+                    </div>
+                    <button @click="uploadResult = null; selectedFile = null; previewData = []; loadSymbols()"
+                            class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search & Symbols List -->
+        <div class="card">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">
+                    <i class="fas fa-list ml-2"></i>
+                    لیست نمادها
+                </h2>
+                <div class="flex gap-3 items-center">
+                    <input type="text"
+                           x-model="searchQuery"
+                           @input="filterSymbols()"
+                           placeholder="جستجو در نمادها..."
+                           class="w-64">
+                    <span class="text-sm text-gray-500">
+                        <span x-text="filteredSymbols.length"></span> نماد
+                    </span>
+                </div>
+            </div>
+
+            <div x-show="symbols.length === 0" class="text-center py-12">
+                <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500 text-lg">هنوز نمادی آپلود نشده است</p>
+                <p class="text-gray-400 text-sm mt-2">فایل Excel خود را آپلود کنید</p>
+            </div>
+
+            <div x-show="symbols.length > 0" class="overflow-x-auto">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ردیف</th>
+                            <th>نماد</th>
+                            <th>صنعت</th>
+                            <th>نام شرکت</th>
+                            <th>وضعیت</th>
+                            <th>عملیات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="(symbol, index) in paginatedSymbols" :key="symbol.id">
+                            <tr>
+                                <td x-text="(currentPage * pageSize) + index + 1"></td>
+                                <td>
+                                    <span class="font-bold text-lg text-blue-600" x-text="symbol.word"></span>
+                                </td>
+                                <td>
+                                    <span class="badge badge-info" x-text="symbol.extra_data?.industry_name || '-'"></span>
+                                </td>
+                                <td x-text="symbol.extra_data?.company_name || '-'"></td>
+                                <td>
+                                    <span class="badge badge-success" x-show="symbol.is_active">
+                                        <i class="fas fa-check ml-1"></i> فعال
+                                    </span>
+                                </td>
+                                <td>
+                                    <button @click="deleteSymbol(symbol.id)"
+                                            class="text-red-600 hover:text-red-800"
+                                            title="حذف">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+
+                <!-- Pagination -->
+                <div class="mt-6 flex justify-center items-center gap-2" x-show="totalPages > 1">
+                    <button @click="currentPage = 0"
+                            :disabled="currentPage === 0"
+                            class="px-3 py-1 border rounded disabled:opacity-50">
+                        <i class="fas fa-angle-double-right"></i>
+                    </button>
+                    <button @click="currentPage--"
+                            :disabled="currentPage === 0"
+                            class="px-3 py-1 border rounded disabled:opacity-50">
+                        <i class="fas fa-angle-right"></i>
+                    </button>
+                    <span class="px-4 py-1">
+                        صفحه <span x-text="currentPage + 1"></span> از <span x-text="totalPages"></span>
+                    </span>
+                    <button @click="currentPage++"
+                            :disabled="currentPage >= totalPages - 1"
+                            class="px-3 py-1 border rounded disabled:opacity-50">
+                        <i class="fas fa-angle-left"></i>
+                    </button>
+                    <button @click="currentPage = totalPages - 1"
+                            :disabled="currentPage >= totalPages - 1"
+                            class="px-3 py-1 border rounded disabled:opacity-50">
+                        <i class="fas fa-angle-double-left"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function dictionaryApp() {
+            return {
+                symbols: [],
+                filteredSymbols: [],
+                searchQuery: '',
+                currentPage: 0,
+                pageSize: 20,
+
+                selectedFile: null,
+                previewData: [],
+                dragover: false,
+                uploading: false,
+                uploadResult: null,
+
+                dictionaryId: null,
+                categoryId: null,
+
+                async init() {
+                    await this.ensureDictionaryAndCategory();
+                    await this.loadSymbols();
+                },
+
+                async ensureDictionaryAndCategory() {
+                    try {
+                        // Check if dictionary exists
+                        let res = await fetch('/api/dictionary/dictionaries');
+                        let dicts = await res.json();
+                        let dict = dicts.find(d => d.name === 'نمادهای بورس');
+
+                        if (!dict) {
+                            // Create dictionary
+                            res = await fetch('/api/dictionary/dictionaries', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    name: 'نمادهای بورس',
+                                    description: 'دیکشنری نمادهای بورس اوراق بهادار تهران',
+                                    is_active: true
+                                })
+                            });
+                            dict = await res.json();
+                        }
+                        this.dictionaryId = dict.id;
+
+                        // Check if category exists
+                        res = await fetch(`/api/dictionary/categories?dictionary_id=${this.dictionaryId}`);
+                        let cats = await res.json();
+                        let cat = cats.find(c => c.name === 'نمادها');
+
+                        if (!cat) {
+                            // Create category
+                            res = await fetch('/api/dictionary/categories', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    dictionary_id: this.dictionaryId,
+                                    name: 'نمادها',
+                                    description: 'نمادهای معاملاتی'
+                                })
+                            });
+                            cat = await res.json();
+                        }
+                        this.categoryId = cat.id;
+                    } catch (e) {
+                        console.error('Error ensuring dictionary:', e);
+                    }
+                },
+
+                async loadSymbols() {
+                    try {
+                        if (!this.categoryId) return;
+                        const res = await fetch(`/api/dictionary/words?category_id=${this.categoryId}`);
+                        if (res.ok) {
+                            this.symbols = await res.json();
+                            this.filterSymbols();
+                        }
+                    } catch (e) {
+                        console.error('Error loading symbols:', e);
+                    }
+                },
+
+                handleFileSelect(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        this.selectedFile = file;
+                        this.parseExcel(file);
+                    }
+                },
+
+                handleDrop(event) {
+                    this.dragover = false;
+                    const file = event.dataTransfer.files[0];
+                    if (file) {
+                        this.selectedFile = file;
+                        this.parseExcel(file);
+                    }
+                },
+
+                parseExcel(file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+                            // Parse data (skip header row)
+                            this.previewData = jsonData.slice(1)
+                                .filter(row => row[0]) // Filter empty rows
+                                .map(row => ({
+                                    symbol: row[0]?.toString().trim(),
+                                    industry: row[1]?.toString().trim() || '',
+                                    company: row[2]?.toString().trim() || ''
+                                }))
+                                .filter(item => item.symbol); // Remove items without symbol
+
+                        } catch (error) {
+                            alert('خطا در خواندن فایل: ' + error.message);
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                },
+
+                async uploadData() {
+                    if (!this.categoryId || this.previewData.length === 0) return;
+
+                    this.uploading = true;
+                    this.uploadResult = null;
+
+                    try {
+                        let successCount = 0;
+
+                        for (const item of this.previewData) {
+                            const payload = {
+                                category_id: this.categoryId,
+                                word: item.symbol,
+                                is_active: true,
+                                extra_data: {
+                                    symbol_name: item.symbol,
+                                    industry_name: item.industry,
+                                    company_name: item.company
+                                }
+                            };
+
+                            const res = await fetch('/api/dictionary/words', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+
+                            if (res.ok) successCount++;
+                        }
+
+                        this.uploadResult = {
+                            success: true,
+                            message: 'آپلود با موفقیت انجام شد!',
+                            count: successCount
+                        };
+
+                    } catch (error) {
+                        this.uploadResult = {
+                            success: false,
+                            message: 'خطا در آپلود: ' + error.message
+                        };
+                    } finally {
+                        this.uploading = false;
+                    }
+                },
+
+                filterSymbols() {
+                    if (!this.searchQuery) {
+                        this.filteredSymbols = this.symbols;
+                    } else {
+                        const query = this.searchQuery.toLowerCase();
+                        this.filteredSymbols = this.symbols.filter(s =>
+                            s.word.toLowerCase().includes(query) ||
+                            s.extra_data?.company_name?.toLowerCase().includes(query) ||
+                            s.extra_data?.industry_name?.toLowerCase().includes(query)
+                        );
+                    }
+                    this.currentPage = 0;
+                },
+
+                async deleteSymbol(id) {
+                    if (!confirm('آیا از حذف این نماد مطمئن هستید؟')) return;
+
+                    try {
+                        await fetch(`/api/dictionary/words/${id}`, { method: 'DELETE' });
+                        await this.loadSymbols();
+                    } catch (e) {
+                        alert('خطا در حذف');
+                    }
+                },
+
+                get paginatedSymbols() {
+                    const start = this.currentPage * this.pageSize;
+                    return this.filteredSymbols.slice(start, start + this.pageSize);
+                },
+
+                get totalPages() {
+                    return Math.ceil(this.filteredSymbols.length / this.pageSize);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

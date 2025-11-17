@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(poetry install:*)",
+      "Bash(python3.11:*)",
+      "Bash(poetry env use:*)",
+      "Bash(poetry env remove:*)",
+      "Bash(poetry show:*)",
+      "Bash(poetry lock:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(poetry run python:*)",
+      "Bash(poetry run alembic:*)",
+      "Bash(poetry run pytest:*)",
+      "Bash(docker exec:*)",
+      "Bash(chmod:*)",
+      "Bash(poetry add:*)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(/tmp/test_dictionary_system.sh)",
+      "Bash(/tmp/test_matching.sh)",
+      "Bash(poetry run python3:*)",
+      "Bash(pkill:*)",
+      "Bash(psql:*)",
+      "Bash(open:*)",
+      "Bash(poetry run uvicorn:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

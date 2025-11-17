@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>آنالیتیکس کانال‌ها - Telegram Data Cleaner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-50" x-data="analyticsApp()">
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center gap-6">
+                    <h1 class="text-2xl font-bold text-gray-900">
+                        <i class="fas fa-chart-line text-blue-600 ml-2"></i>
+                        آنالیتیکس کانال‌ها
+                    </h1>
+                    <nav class="flex gap-4">
+                        <a href="/" class="text-gray-600 hover:text-gray-900">
+                            <i class="fas fa-home ml-1"></i>
+                            خانه
+                        </a>
+                        <a href="/dashboard" class="text-gray-600 hover:text-gray-900">
+                            <i class="fas fa-tachometer-alt ml-1"></i>
+                            داشبورد
+                        </a>
+                        <a href="/matches" class="text-gray-600 hover:text-gray-900">
+                            <i class="fas fa-check-circle ml-1"></i>
+                            تطابق‌ها
+                        </a>
+                        <a href="/analytics" class="text-blue-600 font-semibold">
+                            <i class="fas fa-chart-line ml-1"></i>
+                            آنالیتیکس
+                        </a>
+                    </nav>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button @click="showHelp = true"
+                            class="px-4 py-2 text-sm bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition">
+                        <i class="fas fa-question-circle ml-1"></i>
+                        آموزش
+                    </button>
+                    <button @click="loadChannels()"
+                            class="px-4 py-2 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition">
+                        <i class="fas fa-sync-alt ml-1"></i>
+                        به‌روزرسانی
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- Overview Mode Switcher -->
+        <div class="flex gap-2 mb-6">
+            <button @click="viewMode = 'overview'; loadOverview()"
+                    :class="viewMode === 'overview' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700'"
+                    class="px-6 py-2 rounded-lg font-medium shadow transition">
+                <i class="fas fa-th-large ml-1"></i>
+                نمای کلی
+            </button>
+            <button @click="viewMode = 'channel'"
+                    :class="viewMode === 'channel' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700'"
+                    class="px-6 py-2 rounded-lg font-medium shadow transition">
+                <i class="fas fa-chart-line ml-1"></i>
+                آنالیتیکس کانال
+            </button>
+        </div>
+
+        <!-- Overview Section -->
+        <div x-show="viewMode === 'overview'" class="space-y-6">
+            <!-- Time Range Selector for Overview -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    بازه زمانی نمای کلی
+                </label>
+                <select x-model="overviewDays"
+                        @change="loadOverview()"
+                        class="w-full md:w-1/3 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="1">امروز</option>
+                    <option value="7">7 روز اخیر</option>
+                    <option value="30">30 روز اخیر</option>
+                    <option value="90">90 روز اخیر</option>
+                </select>
+            </div>
+
+            <!-- Global Stats Cards -->
+            <div x-show="overview" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">کل پیام‌ها</p>
+                            <p class="text-2xl font-bold text-gray-900 mt-1" x-text="overview?.totals?.messages || 0"></p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-lg">
+                            <i class="fas fa-envelope text-blue-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">کل تطابق‌ها</p>
+                            <p class="text-2xl font-bold text-green-600 mt-1" x-text="overview?.totals?.matches || 0"></p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-lg">
+                            <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">تعداد کانال‌ها</p>
+                            <p class="text-2xl font-bold text-purple-600 mt-1" x-text="overview?.totals?.channels || 0"></p>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-lg">
+                            <i class="fas fa-broadcast-tower text-purple-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Most Active Channel -->
+            <div x-show="overview?.most_active_channel" class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-3">
+                    <i class="fas fa-trophy text-yellow-500 ml-2"></i>
+                    پرفعال‌ترین کانال
+                </h3>
+                <div class="flex items-center gap-4">
+                    <div class="bg-white rounded-lg p-4 shadow flex-1">
+                        <p class="text-gray-600 text-sm">نام کانال</p>
+                        <p class="text-xl font-bold text-gray-900" x-text="overview?.most_active_channel?.name"></p>
+                    </div>
+                    <div class="bg-white rounded-lg p-4 shadow">
+                        <p class="text-gray-600 text-sm">تعداد پیام</p>
+                        <p class="text-xl font-bold text-blue-600" x-text="overview?.most_active_channel?.message_count"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Busiest Day & Hour -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Busiest Day -->
+                <div x-show="overview?.busiest_day" class="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-3">
+                        <i class="fas fa-calendar-day text-orange-500 ml-2"></i>
+                        پرترافیک‌ترین روز
+                    </h3>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-600 text-sm">تاریخ</p>
+                            <p class="text-xl font-bold text-gray-900" x-text="overview?.busiest_day?.date"></p>
+                        </div>
+                        <div class="text-left">
+                            <p class="text-gray-600 text-sm">تعداد پیام</p>
+                            <p class="text-2xl font-bold text-orange-600" x-text="overview?.busiest_day?.message_count"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Busiest Hour -->
+                <div x-show="overview?.busiest_hour" class="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-3">
+                        <i class="fas fa-clock text-indigo-500 ml-2"></i>
+                        پرترافیک‌ترین ساعت
+                    </h3>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-600 text-sm">بازه زمانی</p>
+                            <p class="text-xl font-bold text-gray-900" x-text="overview?.busiest_hour?.hour_label"></p>
+                        </div>
+                        <div class="text-left">
+                            <p class="text-gray-600 text-sm">تعداد پیام</p>
+                            <p class="text-2xl font-bold text-indigo-600" x-text="overview?.busiest_hour?.message_count"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Lists with Channel Breakdown -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Top Symbols -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-bar text-blue-600 ml-2"></i>
+                        10 نماد برتر
+                    </h3>
+                    <div class="space-y-4">
+                        <template x-for="(symbol, index) in (overview?.top_symbols || [])" :key="index">
+                            <div class="border-r-4 border-blue-500 pr-3">
+                                <!-- Symbol Header -->
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="font-bold text-gray-900" x-text="`${index + 1}. ${symbol.word}`"></span>
+                                    <span class="text-blue-600 font-bold" x-text="symbol.count + ' بار'"></span>
+                                </div>
+                                <!-- Top Channels -->
+                                <div class="space-y-1 mr-3">
+                                    <template x-for="(channel, chIdx) in (symbol.top_channels || [])" :key="chIdx">
+                                        <div class="flex justify-between items-center text-sm py-1">
+                                            <span class="text-gray-700" x-text="channel.channel_name"></span>
+                                            <span class="text-blue-500 font-medium" x-text="`${channel.count} (${channel.percentage}%)`"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="!overview?.top_symbols || overview.top_symbols.length === 0" class="text-center text-gray-500 py-4">
+                            داده‌ای موجود نیست
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Industries -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-industry text-green-600 ml-2"></i>
+                        10 صنعت برتر
+                    </h3>
+                    <div class="space-y-4">
+                        <template x-for="(industry, index) in (overview?.top_industries || [])" :key="index">
+                            <div class="border-r-4 border-green-500 pr-3">
+                                <!-- Industry Header -->
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="font-bold text-gray-900" x-text="`${index + 1}. ${industry.name}`"></span>
+                                    <span class="text-green-600 font-bold" x-text="industry.count + ' بار'"></span>
+                                </div>
+                                <!-- Top Channels -->
+                                <div class="space-y-1 mr-3">
+                                    <template x-for="(channel, chIdx) in (industry.top_channels || [])" :key="chIdx">
+                                        <div class="flex justify-between items-center text-sm py-1">
+                                            <span class="text-gray-700" x-text="channel.channel_name"></span>
+                                            <span class="text-green-500 font-medium" x-text="`${channel.count} (${channel.percentage}%)`"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="!overview?.top_industries || overview.top_industries.length === 0" class="text-center text-gray-500 py-4">
+                            داده‌ای موجود نیست
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Categories (Dictionaries) -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-tags text-purple-600 ml-2"></i>
+                        10 لغت‌نامه برتر
+                    </h3>
+                    <div class="space-y-4">
+                        <template x-for="(category, index) in (overview?.top_categories || [])" :key="index">
+                            <div class="border-r-4 border-purple-500 pr-3">
+                                <!-- Category Header -->
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="font-bold text-gray-900" x-text="`${index + 1}. ${category.name}`"></span>
+                                    <span class="text-purple-600 font-bold" x-text="category.count + ' بار'"></span>
+                                </div>
+                                <!-- Top Channels with "View Words" button -->
+                                <div class="space-y-1 mr-3">
+                                    <template x-for="(channel, chIdx) in (category.top_channels || [])" :key="chIdx">
+                                        <div class="flex justify-between items-center text-sm py-1">
+                                            <div class="flex items-center gap-2 flex-1">
+                                                <span class="text-gray-700" x-text="channel.channel_name"></span>
+                                                <button @click="showDictionaryWords(category.name, channel.channel_id, channel.channel_name)"
+                                                        class="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200">
+                                                    <i class="fas fa-list text-xs"></i>
+                                                </button>
+                                            </div>
+                                            <span class="text-purple-500 font-medium" x-text="`${channel.count} (${channel.percentage}%)`"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="!overview?.top_categories || overview.top_categories.length === 0" class="text-center text-gray-500 py-4">
+                            داده‌ای موجود نیست
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- All Channels List -->
+            <div x-show="overview?.all_channels" class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-list text-gray-600 ml-2"></i>
+                    لیست کانال‌ها
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">نام کانال</th>
+                                <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">یوزرنیم</th>
+                                <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">تعداد پیام</th>
+                                <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">تعداد تطابق</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <template x-for="channel in (overview?.all_channels || [])" :key="channel.id">
+                                <tr class="hover:bg-gray-50 cursor-pointer" @click="selectChannelFromOverview(channel.id)">
+                                    <td class="px-4 py-3 text-sm text-gray-900" x-text="channel.name"></td>
+                                    <td class="px-4 py-3 text-sm text-gray-600" x-text="channel.username"></td>
+                                    <td class="px-4 py-3 text-sm text-gray-900" x-text="channel.total_messages"></td>
+                                    <td class="px-4 py-3 text-sm text-green-600 font-medium" x-text="channel.total_matches"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Channel Analytics Section -->
+        <div x-show="viewMode === 'channel'">
+            <!-- Filters -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Channel Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            انتخاب کانال
+                        </label>
+                        <select x-model="selectedChannel"
+                                @change="loadAnalytics()"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">انتخاب کنید...</option>
+                            <template x-for="channel in channels" :key="channel.id">
+                                <option :value="channel.id" x-text="channel.name"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <!-- Time Range -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            بازه زمانی
+                        </label>
+                        <select x-model="timeRange"
+                                @change="loadAnalytics()"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="5min">5 دقیقه اخیر</option>
+                            <option value="30min">30 دقیقه اخیر</option>
+                            <option value="1hour">1 ساعت اخیر</option>
+                            <option value="today">امروز</option>
+                            <option value="7days">7 روز اخیر</option>
+                            <option value="30days">30 روز اخیر</option>
+                        </select>
+                    </div>
+
+                    <!-- Export -->
+                    <div class="flex items-end">
+                        <button @click="exportToExcel()"
+                                :disabled="!selectedChannel"
+                                class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition">
+                            <i class="fas fa-file-excel ml-1"></i>
+                            خروجی Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div x-show="loading" class="text-center py-12">
+            <i class="fas fa-spinner fa-spin text-4xl text-blue-600"></i>
+            <p class="mt-4 text-gray-600">در حال بارگذاری...</p>
+        </div>
+
+        <!-- No Channel Selected -->
+        <div x-show="!selectedChannel && !loading" class="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
+            <i class="fas fa-chart-line text-6xl text-blue-300 mb-4"></i>
+            <h3 class="text-xl font-semibold text-gray-800 mb-2">کانالی انتخاب نشده است</h3>
+            <p class="text-gray-600">لطفاً یک کانال را از لیست بالا انتخاب کنید تا آنالیتیکس آن نمایش داده شود.</p>
+        </div>
+
+        <!-- Analytics Display -->
+        <div x-show="selectedChannel && !loading && analytics" class="space-y-6">
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <!-- Total Messages -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">تعداد پیام‌ها</p>
+                            <p class="text-2xl font-bold text-gray-900 mt-1" x-text="analytics?.message_count || 0"></p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-lg">
+                            <i class="fas fa-messages text-blue-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Total Matches -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">تعداد تطابق‌ها</p>
+                            <p class="text-2xl font-bold text-green-600 mt-1" x-text="analytics?.match_count || 0"></p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-lg">
+                            <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Match Percentage -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">درصد تطابق</p>
+                            <p class="text-2xl font-bold text-purple-600 mt-1" x-text="getMatchPercentage() + '%'"></p>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-lg">
+                            <i class="fas fa-percentage text-purple-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Primary Focus -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">تمرکز اصلی</p>
+                            <p class="text-lg font-bold text-orange-600 mt-1" x-text="analytics?.primary_focus || 'N/A'"></p>
+                        </div>
+                        <div class="bg-orange-100 p-3 rounded-lg">
+                            <i class="fas fa-bullseye text-orange-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                <!-- Top Symbols Chart -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-bar text-blue-600 ml-2"></i>
+                        10 نماد برتر
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="symbolsChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Top Categories Chart -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-pie text-green-600 ml-2"></i>
+                        دسته‌بندی‌های محتوا
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="categoriesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Industries Table -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-industry text-purple-600 ml-2"></i>
+                    10 صنعت برتر
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">رتبه</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">نام صنعت</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">تعداد</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">نمودار</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <template x-for="(industry, index) in (analytics?.top_industries || [])" :key="index">
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="index + 1"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="industry.name"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="industry.count"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="w-full bg-gray-200 rounded-full h-2">
+                                            <div class="bg-purple-600 h-2 rounded-full"
+                                                 :style="`width: ${getIndustryPercentage(industry.count)}%`"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr x-show="!analytics?.top_industries || analytics.top_industries.length === 0">
+                                <td colspan="4" class="px-6 py-4 text-center text-gray-500">داده‌ای یافت نشد</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Timeline Analytics Section -->
+            <div x-show="timeline" class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold text-gray-900">
+                        <i class="fas fa-chart-line text-blue-600 ml-2"></i>
+                        تحلیل تایم‌لاین (15 روز اخیر)
+                    </h3>
+                    <div class="text-sm text-gray-600">
+                        میانگین پیام در روز: <span class="font-bold text-blue-600" x-text="timeline?.summary?.avg_messages_per_day || 0"></span>
+                    </div>
+                </div>
+
+                <!-- Timeline Chart -->
+                <div class="mb-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-4">نمودار پیام‌ها و تطابق‌ها</h4>
+                    <div class="chart-container">
+                        <canvas id="timelineChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Symbol Timeline -->
+                <div class="mb-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-chart-bar text-orange-600 ml-2"></i>
+                        روند نمادها
+                    </h4>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Line Chart -->
+                        <div>
+                            <p class="text-sm text-gray-600 mb-2">نمودار خطی</p>
+                            <div class="chart-container">
+                                <canvas id="symbolLineChart"></canvas>
+                            </div>
+                        </div>
+                        <!-- Bar Chart -->
+                        <div>
+                            <p class="text-sm text-gray-600 mb-2">نمودار میله‌ای</p>
+                            <div class="chart-container">
+                                <canvas id="symbolBarChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Table -->
+                    <div class="mt-4">
+                        <p class="text-sm text-gray-600 mb-2">جدول داده‌ها</p>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500">تاریخ</th>
+                                        <template x-for="symbol in Object.keys(timeline?.symbol_timeline || {})" :key="symbol">
+                                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500" x-text="symbol"></th>
+                                        </template>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <template x-for="(day, idx) in (timeline?.timeline || [])" :key="idx">
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-4 py-2 text-sm text-gray-900" x-text="day.date"></td>
+                                            <template x-for="symbol in Object.keys(timeline?.symbol_timeline || {})" :key="symbol">
+                                                <td class="px-4 py-2 text-sm text-gray-900" x-text="timeline.symbol_timeline[symbol][idx]?.count || 0"></td>
+                                            </template>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Industry Timeline -->
+                <div class="mb-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-industry text-purple-600 ml-2"></i>
+                        روند صنایع
+                    </h4>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Line Chart -->
+                        <div>
+                            <p class="text-sm text-gray-600 mb-2">نمودار خطی</p>
+                            <div class="chart-container">
+                                <canvas id="industryLineChart"></canvas>
+                            </div>
+                        </div>
+                        <!-- Bar Chart -->
+                        <div>
+                            <p class="text-sm text-gray-600 mb-2">نمودار میله‌ای</p>
+                            <div class="chart-container">
+                                <canvas id="industryBarChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Table -->
+                    <div class="mt-4">
+                        <p class="text-sm text-gray-600 mb-2">جدول داده‌ها</p>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500">تاریخ</th>
+                                        <template x-for="industry in Object.keys(timeline?.industry_timeline || {})" :key="industry">
+                                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500" x-text="industry"></th>
+                                        </template>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <template x-for="(day, idx) in (timeline?.timeline || [])" :key="idx">
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-4 py-2 text-sm text-gray-900" x-text="day.date"></td>
+                                            <template x-for="industry in Object.keys(timeline?.industry_timeline || {})" :key="industry">
+                                                <td class="px-4 py-2 text-sm text-gray-900" x-text="timeline.industry_timeline[industry][idx]?.count || 0"></td>
+                                            </template>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Category Timeline -->
+                <div>
+                    <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-book text-green-600 ml-2"></i>
+                        روند لغت‌نامه‌ها
+                    </h4>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Line Chart -->
+                        <div>
+                            <p class="text-sm text-gray-600 mb-2">نمودار خطی</p>
+                            <div class="chart-container">
+                                <canvas id="categoryLineChart"></canvas>
+                            </div>
+                        </div>
+                        <!-- Bar Chart -->
+                        <div>
+                            <p class="text-sm text-gray-600 mb-2">نمودار میله‌ای</p>
+                            <div class="chart-container">
+                                <canvas id="categoryBarChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Table -->
+                    <div class="mt-4">
+                        <p class="text-sm text-gray-600 mb-2">جدول داده‌ها</p>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500">تاریخ</th>
+                                        <template x-for="category in Object.keys(timeline?.category_timeline || {})" :key="category">
+                                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500" x-text="category"></th>
+                                        </template>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <template x-for="(day, idx) in (timeline?.timeline || [])" :key="idx">
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-4 py-2 text-sm text-gray-900" x-text="day.date"></td>
+                                            <template x-for="category in Object.keys(timeline?.category_timeline || {})" :key="category">
+                                                <td class="px-4 py-2 text-sm text-gray-900" x-text="timeline.category_timeline[category][idx]?.count || 0"></td>
+                                            </template>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hourly Activity Section -->
+            <div x-show="hourlyActivity" class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold text-gray-900">
+                        <i class="fas fa-clock text-indigo-600 ml-2"></i>
+                        فعالیت ساعتی کانال
+                    </h3>
+                    <div class="text-sm text-gray-600">
+                        پرترافیک‌ترین ساعت: <span class="font-bold text-indigo-600" x-text="hourlyActivity?.busiest_hour?.hour_label || '-'"></span>
+                    </div>
+                </div>
+
+                <!-- Hourly Bar Chart -->
+                <div class="mb-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-4">نمودار میله‌ای فعالیت ساعتی</h4>
+                    <div class="chart-container">
+                        <canvas id="hourlyBarChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Hourly Heatmap -->
+                <div>
+                    <h4 class="text-lg font-semibold text-gray-800 mb-4">نقشه حرارتی فعالیت (روز × ساعت)</h4>
+                    <div class="chart-container">
+                        <canvas id="hourlyHeatmap"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Help Modal -->
+    <div x-show="showHelp"
+         x-cloak
+         @click.self="showHelp = false"
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-gray-900">
+                    <i class="fas fa-question-circle text-green-600 ml-2"></i>
+                    راهنمای آنالیتیکس کانال‌ها
+                </h2>
+                <button @click="showHelp = false" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-6">
+                <!-- Section 1 -->
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-3">
+                        <i class="fas fa-info-circle text-blue-600 ml-2"></i>
+                        آنالیتیکس کانال‌ها چیست؟
+                    </h3>
+                    <p class="text-gray-700 leading-relaxed">
+                        این صفحه به شما امکان می‌دهد که آمار و تحلیل دقیقی از محتوای کانال‌های تلگرام داشته باشید. شما می‌توانید ببینید که هر کانال چه تعداد پیام دارد، چند تطابق با لغت‌نامه پیدا شده، و کانال روی چه نمادها و صنایعی تمرکز دارد.
+                    </p>
+                </div>
+
+                <!-- Section 2 -->
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-3">
+                        <i class="fas fa-filter text-purple-600 ml-2"></i>
+                        نحوه استفاده از فیلترها
+                    </h3>
+                    <ol class="list-decimal list-inside space-y-2 text-gray-700">
+                        <li><strong>انتخاب کانال:</strong> ابتدا یک کانال را از لیست کشویی انتخاب کنید</li>
+                        <li><strong>بازه زمانی:</strong> بازه زمانی مورد نظر خود را انتخاب کنید (از 5 دقیقه تا 30 روز)</li>
+                        <li><strong>خروجی Excel:</strong> برای دانلود گزارش کامل به صورت فایل اکسل</li>
+                    </ol>
+                </div>
+
+                <!-- Section 3 -->
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-3">
+                        <i class="fas fa-chart-line text-green-600 ml-2"></i>
+                        توضیح نمودارها و آمار
+                    </h3>
+                    <ul class="space-y-2 text-gray-700">
+                        <li><strong>تعداد پیام‌ها:</strong> مجموع پیام‌های دریافت شده در بازه زمانی انتخابی</li>
+                        <li><strong>تعداد تطابق‌ها:</strong> تعداد پیام‌هایی که حداقل یک کلمه از لغت‌نامه در آن‌ها پیدا شده</li>
+                        <li><strong>درصد تطابق:</strong> نسبت پیام‌های دارای تطابق به کل پیام‌ها</li>
+                        <li><strong>تمرکز اصلی:</strong> دسته‌بندی‌ای که بیشترین تطابق را داشته</li>
+                        <li><strong>10 نماد برتر:</strong> پرتکرارترین نمادهای ذکر شده در پیام‌ها</li>
+                        <li><strong>دسته‌بندی‌های محتوا:</strong> توزیع محتوا بر اساس دسته‌بندی‌های لغت‌نامه</li>
+                        <li><strong>10 صنعت برتر:</strong> صنایعی که بیشتر در پیام‌ها ذکر شده‌اند</li>
+                    </ul>
+                </div>
+
+                <!-- Section 4 -->
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-3">
+                        <i class="fas fa-file-excel text-green-600 ml-2"></i>
+                        خروجی Excel
+                    </h3>
+                    <p class="text-gray-700 leading-relaxed mb-2">
+                        فایل Excel شامل 4 شیت است:
+                    </p>
+                    <ul class="list-disc list-inside space-y-1 text-gray-700">
+                        <li><strong>Overview:</strong> خلاصه‌ای از کل آمار</li>
+                        <li><strong>Categories:</strong> جدول کامل دسته‌بندی‌ها با درصدها</li>
+                        <li><strong>Top Symbols:</strong> 10 نماد برتر</li>
+                        <li><strong>Top Industries:</strong> 10 صنعت برتر</li>
+                    </ul>
+                </div>
+
+                <!-- Section 5 -->
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                        <i class="fas fa-lightbulb text-yellow-600 ml-2"></i>
+                        نکات مهم
+                    </h3>
+                    <ul class="space-y-1 text-gray-700 text-sm">
+                        <li>• آمار هر 5 دقیقه یکبار به‌روزرسانی می‌شود</li>
+                        <li>• برای بازه‌های زمانی طولانی‌تر (7 روز، 30 روز) از داده‌های از پیش محاسبه شده استفاده می‌شود</li>
+                        <li>• اگر آماری نشان داده نشد، ممکن است کانال پیامی نداشته باشد</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
+                <button @click="showHelp = false"
+                        class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    متوجه شدم
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function analyticsApp() {
+            return {
+                channels: [],
+                selectedChannel: '',
+                timeRange: '30min',
+                loading: false,
+                analytics: null,
+                showHelp: false,
+                symbolsChart: null,
+                categoriesChart: null,
+
+                // Timeline and hourly activity
+                timeline: null,
+                hourlyActivity: null,
+                timelineCharts: {},
+                hourlyCharts: {},
+
+                // Overview mode
+                viewMode: 'overview',
+                overview: null,
+                overviewDays: 7,
+
+                async init() {
+                    await this.loadChannels();
+                    await this.loadOverview();
+                },
+
+                async loadOverview() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch(`/api/analytics/overview?days=${this.overviewDays}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to load overview');
+                        }
+                        this.overview = await response.json();
+                    } catch (error) {
+                        console.error('Error loading overview:', error);
+                        alert('خطا در بارگذاری نمای کلی');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                selectChannelFromOverview(channelId) {
+                    this.selectedChannel = channelId;
+                    this.viewMode = 'channel';
+                    this.loadAnalytics();
+                },
+
+                async loadChannels() {
+                    try {
+                        const response = await fetch('/api/ingestion/channels');
+                        const data = await response.json();
+                        this.channels = data.channels || [];
+                    } catch (error) {
+                        console.error('Error loading channels:', error);
+                        alert('خطا در بارگذاری کانال‌ها');
+                    }
+                },
+
+                async loadAnalytics() {
+                    if (!this.selectedChannel) {
+                        this.analytics = null;
+                        this.timeline = null;
+                        this.hourlyActivity = null;
+                        return;
+                    }
+
+                    this.loading = true;
+                    try {
+                        // Load main analytics
+                        const response = await fetch(
+                            `/api/analytics/channels/${this.selectedChannel}/stats?time_range=${this.timeRange}`
+                        );
+
+                        if (!response.ok) {
+                            throw new Error('Failed to load analytics');
+                        }
+
+                        this.analytics = await response.json();
+
+                        // Load timeline data (15 days)
+                        const timelineResponse = await fetch(
+                            `/api/analytics/channels/${this.selectedChannel}/timeline?days=15`
+                        );
+                        if (timelineResponse.ok) {
+                            this.timeline = await timelineResponse.json();
+                        }
+
+                        // Load hourly activity (7 days)
+                        const hourlyResponse = await fetch(
+                            `/api/analytics/channels/${this.selectedChannel}/hourly-activity?days=7`
+                        );
+                        if (hourlyResponse.ok) {
+                            this.hourlyActivity = await hourlyResponse.json();
+                        }
+
+                        // Wait for DOM update
+                        await this.$nextTick();
+                        this.renderCharts();
+                        this.renderTimelineCharts();
+                        this.renderHourlyCharts();
+                    } catch (error) {
+                        console.error('Error loading analytics:', error);
+                        alert('خطا در بارگذاری آنالیتیکس');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                renderCharts() {
+                    this.renderSymbolsChart();
+                    this.renderCategoriesChart();
+                },
+
+                renderSymbolsChart() {
+                    const ctx = document.getElementById('symbolsChart');
+                    if (!ctx) return;
+
+                    const symbols = this.analytics?.top_symbols || [];
+
+                    if (this.symbolsChart) {
+                        this.symbolsChart.destroy();
+                    }
+
+                    this.symbolsChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: symbols.map(s => s.word),
+                            datasets: [{
+                                label: 'تعداد',
+                                data: symbols.map(s => s.count),
+                                backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                                borderColor: 'rgba(59, 130, 246, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                },
+
+                renderCategoriesChart() {
+                    const ctx = document.getElementById('categoriesChart');
+                    if (!ctx) return;
+
+                    const categories = this.analytics?.categories || [];
+
+                    if (this.categoriesChart) {
+                        this.categoriesChart.destroy();
+                    }
+
+                    const colors = [
+                        'rgba(59, 130, 246, 0.8)',
+                        'rgba(16, 185, 129, 0.8)',
+                        'rgba(249, 115, 22, 0.8)',
+                        'rgba(139, 92, 246, 0.8)',
+                        'rgba(236, 72, 153, 0.8)',
+                        'rgba(245, 158, 11, 0.8)',
+                        'rgba(20, 184, 166, 0.8)',
+                        'rgba(239, 68, 68, 0.8)',
+                        'rgba(99, 102, 241, 0.8)',
+                        'rgba(168, 85, 247, 0.8)',
+                    ];
+
+                    this.categoriesChart = new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: categories.map(c => c.name),
+                            datasets: [{
+                                data: categories.map(c => c.count),
+                                backgroundColor: colors.slice(0, categories.length),
+                                borderWidth: 2,
+                                borderColor: '#fff'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'right',
+                                    rtl: true
+                                }
+                            }
+                        }
+                    });
+                },
+
+                renderTimelineCharts() {
+                    if (!this.timeline) return;
+
+                    // Timeline Chart (Messages and Matches)
+                    const timelineCtx = document.getElementById('timelineChart');
+                    if (timelineCtx) {
+                        if (this.timelineCharts.timeline) this.timelineCharts.timeline.destroy();
+
+                        const dates = this.timeline.timeline.map(t => t.date);
+                        const messageCounts = this.timeline.timeline.map(t => t.message_count);
+                        const matchCounts = this.timeline.timeline.map(t => t.match_count);
+
+                        this.timelineCharts.timeline = new Chart(timelineCtx, {
+                            type: 'line',
+                            data: {
+                                labels: dates,
+                                datasets: [
+                                    {
+                                        label: 'کل پیام‌ها',
+                                        data: messageCounts,
+                                        borderColor: 'rgba(59, 130, 246, 1)',
+                                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                        fill: true,
+                                        tension: 0.4
+                                    },
+                                    {
+                                        label: 'تطابق‌ها',
+                                        data: matchCounts,
+                                        borderColor: 'rgba(16, 185, 129, 1)',
+                                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                        fill: true,
+                                        tension: 0.4
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                interaction: {
+                                    mode: 'index',
+                                    intersect: false,
+                                },
+                                plugins: {
+                                    legend: {
+                                        position: 'top',
+                                        rtl: true
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    // Symbol Line Chart
+                    this.renderSymbolTimelineCharts();
+                    // Industry Line Chart
+                    this.renderIndustryTimelineCharts();
+                    // Category Line Chart
+                    this.renderCategoryTimelineCharts();
+                },
+
+                renderSymbolTimelineCharts() {
+                    if (!this.timeline || !this.timeline.symbol_timeline) return;
+
+                    const dates = this.timeline.timeline.map(t => t.date);
+                    const symbols = Object.keys(this.timeline.symbol_timeline);
+
+                    const colors = ['#3B82F6', '#10B981', '#F97316', '#8B5CF6', '#EC4899'];
+
+                    // Line Chart
+                    const lineCtx = document.getElementById('symbolLineChart');
+                    if (lineCtx) {
+                        if (this.timelineCharts.symbolLine) this.timelineCharts.symbolLine.destroy();
+
+                        const datasets = symbols.map((symbol, idx) => ({
+                            label: symbol,
+                            data: this.timeline.symbol_timeline[symbol].map(d => d.count),
+                            borderColor: colors[idx % colors.length],
+                            backgroundColor: colors[idx % colors.length] + '20',
+                            tension: 0.4,
+                            fill: false
+                        }));
+
+                        this.timelineCharts.symbolLine = new Chart(lineCtx, {
+                            type: 'line',
+                            data: { labels: dates, datasets: datasets },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { position: 'top', rtl: true } },
+                                scales: { y: { beginAtZero: true } }
+                            }
+                        });
+                    }
+
+                    // Bar Chart
+                    const barCtx = document.getElementById('symbolBarChart');
+                    if (barCtx) {
+                        if (this.timelineCharts.symbolBar) this.timelineCharts.symbolBar.destroy();
+
+                        const datasets = symbols.map((symbol, idx) => ({
+                            label: symbol,
+                            data: this.timeline.symbol_timeline[symbol].map(d => d.count),
+                            backgroundColor: colors[idx % colors.length],
+                        }));
+
+                        this.timelineCharts.symbolBar = new Chart(barCtx, {
+                            type: 'bar',
+                            data: { labels: dates, datasets: datasets },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { position: 'top', rtl: true } },
+                                scales: { y: { beginAtZero: true, stacked: false }, x: { stacked: false } }
+                            }
+                        });
+                    }
+                },
+
+                renderIndustryTimelineCharts() {
+                    if (!this.timeline || !this.timeline.industry_timeline) return;
+
+                    const dates = this.timeline.timeline.map(t => t.date);
+                    const industries = Object.keys(this.timeline.industry_timeline);
+
+                    const colors = ['#8B5CF6', '#EC4899', '#F59E0B', '#14B8A6', '#EF4444'];
+
+                    // Line Chart
+                    const lineCtx = document.getElementById('industryLineChart');
+                    if (lineCtx) {
+                        if (this.timelineCharts.industryLine) this.timelineCharts.industryLine.destroy();
+
+                        const datasets = industries.map((industry, idx) => ({
+                            label: industry,
+                            data: this.timeline.industry_timeline[industry].map(d => d.count),
+                            borderColor: colors[idx % colors.length],
+                            backgroundColor: colors[idx % colors.length] + '20',
+                            tension: 0.4,
+                            fill: false
+                        }));
+
+                        this.timelineCharts.industryLine = new Chart(lineCtx, {
+                            type: 'line',
+                            data: { labels: dates, datasets: datasets },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { position: 'top', rtl: true } },
+                                scales: { y: { beginAtZero: true } }
+                            }
+                        });
+                    }
+
+                    // Bar Chart
+                    const barCtx = document.getElementById('industryBarChart');
+                    if (barCtx) {
+                        if (this.timelineCharts.industryBar) this.timelineCharts.industryBar.destroy();
+
+                        const datasets = industries.map((industry, idx) => ({
+                            label: industry,
+                            data: this.timeline.industry_timeline[industry].map(d => d.count),
+                            backgroundColor: colors[idx % colors.length],
+                        }));
+
+                        this.timelineCharts.industryBar = new Chart(barCtx, {
+                            type: 'bar',
+                            data: { labels: dates, datasets: datasets },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { position: 'top', rtl: true } },
+                                scales: { y: { beginAtZero: true, stacked: false }, x: { stacked: false } }
+                            }
+                        });
+                    }
+                },
+
+                renderCategoryTimelineCharts() {
+                    if (!this.timeline || !this.timeline.category_timeline) return;
+
+                    const dates = this.timeline.timeline.map(t => t.date);
+                    const categories = Object.keys(this.timeline.category_timeline);
+
+                    const colors = ['#10B981', '#3B82F6', '#F97316', '#8B5CF6', '#EC4899'];
+
+                    // Line Chart
+                    const lineCtx = document.getElementById('categoryLineChart');
+                    if (lineCtx) {
+                        if (this.timelineCharts.categoryLine) this.timelineCharts.categoryLine.destroy();
+
+                        const datasets = categories.map((category, idx) => ({
+                            label: category,
+                            data: this.timeline.category_timeline[category].map(d => d.count),
+                            borderColor: colors[idx % colors.length],
+                            backgroundColor: colors[idx % colors.length] + '20',
+                            tension: 0.4,
+                            fill: false
+                        }));
+
+                        this.timelineCharts.categoryLine = new Chart(lineCtx, {
+                            type: 'line',
+                            data: { labels: dates, datasets: datasets },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { position: 'top', rtl: true } },
+                                scales: { y: { beginAtZero: true } }
+                            }
+                        });
+                    }
+
+                    // Bar Chart
+                    const barCtx = document.getElementById('categoryBarChart');
+                    if (barCtx) {
+                        if (this.timelineCharts.categoryBar) this.timelineCharts.categoryBar.destroy();
+
+                        const datasets = categories.map((category, idx) => ({
+                            label: category,
+                            data: this.timeline.category_timeline[category].map(d => d.count),
+                            backgroundColor: colors[idx % colors.length],
+                        }));
+
+                        this.timelineCharts.categoryBar = new Chart(barCtx, {
+                            type: 'bar',
+                            data: { labels: dates, datasets: datasets },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { position: 'top', rtl: true } },
+                                scales: { y: { beginAtZero: true, stacked: false }, x: { stacked: false } }
+                            }
+                        });
+                    }
+                },
+
+                renderHourlyCharts() {
+                    if (!this.hourlyActivity) return;
+
+                    // Hourly Bar Chart
+                    const barCtx = document.getElementById('hourlyBarChart');
+                    if (barCtx) {
+                        if (this.hourlyCharts.bar) this.hourlyCharts.bar.destroy();
+
+                        const hours = this.hourlyActivity.hourly_data.map(h => h.hour_label);
+                        const counts = this.hourlyActivity.hourly_data.map(h => h.count);
+
+                        this.hourlyCharts.bar = new Chart(barCtx, {
+                            type: 'bar',
+                            data: {
+                                labels: hours,
+                                datasets: [{
+                                    label: 'تعداد پیام',
+                                    data: counts,
+                                    backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                                    borderColor: 'rgba(99, 102, 241, 1)',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        display: false
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    // Hourly Heatmap (using Chart.js matrix plugin or custom implementation)
+                    const heatmapCtx = document.getElementById('hourlyHeatmap');
+                    if (heatmapCtx) {
+                        if (this.hourlyCharts.heatmap) this.hourlyCharts.heatmap.destroy();
+
+                        // Flatten heatmap data for visualization
+                        const heatmapData = [];
+                        this.hourlyActivity.heatmap_data.forEach((dayData, dayIdx) => {
+                            dayData.hours.forEach((count, hourIdx) => {
+                                heatmapData.push({
+                                    x: hourIdx,
+                                    y: dayIdx,
+                                    v: count
+                                });
+                            });
+                        });
+
+                        // Create a simple bar chart representation (can be upgraded to matrix plugin)
+                        const labels = Array.from({length: 24}, (_, i) => `${i}:00`);
+                        const datasets = this.hourlyActivity.heatmap_data.map((dayData, idx) => ({
+                            label: dayData.date,
+                            data: dayData.hours,
+                            backgroundColor: `rgba(99, 102, 241, ${0.3 + (idx * 0.1)})`
+                        }));
+
+                        this.hourlyCharts.heatmap = new Chart(heatmapCtx, {
+                            type: 'bar',
+                            data: {
+                                labels: labels,
+                                datasets: datasets
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        display: true,
+                                        position: 'right',
+                                        rtl: true
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        stacked: true
+                                    },
+                                    x: {
+                                        stacked: true
+                                    }
+                                }
+                            }
+                        });
+                    }
+                },
+
+                getMatchPercentage() {
+                    if (!this.analytics || !this.analytics.message_count) return 0;
+                    const percentage = (this.analytics.match_count / this.analytics.message_count) * 100;
+                    return percentage.toFixed(1);
+                },
+
+                getIndustryPercentage(count) {
+                    if (!this.analytics?.top_industries || this.analytics.top_industries.length === 0) return 0;
+                    const maxCount = Math.max(...this.analytics.top_industries.map(i => i.count));
+                    return (count / maxCount) * 100;
+                },
+
+                async exportToExcel() {
+                    if (!this.selectedChannel) {
+                        alert('لطفاً ابتدا یک کانال انتخاب کنید');
+                        return;
+                    }
+
+                    try {
+                        const days = this.timeRange === '7days' ? 7 : this.timeRange === '30days' ? 30 : 1;
+                        const url = `/api/analytics/channels/${this.selectedChannel}/export/excel?days=${days}`;
+
+                        window.location.href = url;
+                    } catch (error) {
+                        console.error('Error exporting to Excel:', error);
+                        alert('خطا در خروجی گرفتن');
+                    }
+                },
+
+                // Dictionary words modal
+                showDictionaryModal: false,
+                dictionaryModalData: {
+                    dictionaryName: '',
+                    channelName: '',
+                    words: [],
+                    loading: false
+                },
+
+                async showDictionaryWords(dictionaryName, channelId, channelName) {
+                    this.dictionaryModalData = {
+                        dictionaryName: dictionaryName,
+                        channelName: channelName,
+                        words: [],
+                        loading: true
+                    };
+                    this.showDictionaryModal = true;
+
+                    try {
+                        // Fetch dictionary words for this channel
+                        const days = this.selectedTimeRange === '7days' ? 7 : this.selectedTimeRange === '30days' ? 30 : this.selectedTimeRange === 'today' ? 1 : 7;
+                        const url = `/api/analytics/channels/${channelId}/dictionary-words?dictionary_name=${encodeURIComponent(dictionaryName)}&days=${days}`;
+
+                        const response = await fetch(url);
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.dictionaryModalData.words = data.words || [];
+                        } else {
+                            console.error('Failed to fetch dictionary words');
+                            this.dictionaryModalData.words = [];
+                        }
+                    } catch (error) {
+                        console.error('Error fetching dictionary words:', error);
+                        this.dictionaryModalData.words = [];
+                    } finally {
+                        this.dictionaryModalData.loading = false;
+                    }
+                },
+
+                closeDictionaryModal() {
+                    this.showDictionaryModal = false;
+                }
+            }
+        }
+    </script>
+
+    <!-- Dictionary Words Modal -->
+    <div x-show="showDictionaryModal"
+         x-cloak
+         @click.self="closeDictionaryModal()"
+         class="fixed inset-0 z-50 overflow-y-auto"
+         style="display: none;">
+        <!-- Overlay -->
+        <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
+
+        <!-- Modal Content -->
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="inline-block align-bottom bg-white rounded-lg text-right overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                <!-- Header -->
+                <div class="gradient-bg px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xl font-bold text-white">
+                            <i class="fas fa-book ml-2"></i>
+                            کلمات لغت‌نامه
+                        </h3>
+                        <button @click="closeDictionaryModal()" class="text-white hover:text-gray-200">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                    <div class="mt-2 text-white/90 text-sm">
+                        <div>لغت‌نامه: <span class="font-semibold" x-text="dictionaryModalData.dictionaryName"></span></div>
+                        <div>کانال: <span class="font-semibold" x-text="dictionaryModalData.channelName"></span></div>
+                    </div>
+                </div>
+
+                <!-- Body -->
+                <div class="px-6 py-4 max-h-96 overflow-y-auto">
+                    <!-- Loading State -->
+                    <div x-show="dictionaryModalData.loading" class="text-center py-12">
+                        <i class="fas fa-spinner fa-spin text-4xl text-gray-400"></i>
+                        <p class="text-gray-500 mt-4">در حال بارگذاری...</p>
+                    </div>
+
+                    <!-- No Data -->
+                    <div x-show="!dictionaryModalData.loading && dictionaryModalData.words.length === 0" class="text-center py-12">
+                        <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500">هیچ کلمه‌ای یافت نشد</p>
+                    </div>
+
+                    <!-- Words List -->
+                    <div x-show="!dictionaryModalData.loading && dictionaryModalData.words.length > 0" class="space-y-2">
+                        <template x-for="(word, index) in dictionaryModalData.words" :key="index">
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                                <div class="flex-1">
+                                    <div class="font-semibold text-gray-900" x-text="word.word"></div>
+                                    <template x-if="word.extra_data && word.extra_data.company_name">
+                                        <div class="text-sm text-gray-600" x-text="word.extra_data.company_name"></div>
+                                    </template>
+                                </div>
+                                <div class="text-left">
+                                    <div class="text-2xl font-bold text-purple-600" x-text="word.count"></div>
+                                    <div class="text-xs text-gray-500">تکرار</div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="bg-gray-50 px-6 py-3 flex justify-end">
+                    <button @click="closeDictionaryModal()" class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+                        <i class="fas fa-times ml-2"></i>
+                        بستن
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

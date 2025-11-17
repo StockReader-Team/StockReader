@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نتایج Matching - کلمات یافت شده</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap');
+        * { font-family: 'Vazirmatn', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .highlight { background-color: #fef08a; padding: 0 4px; border-radius: 3px; font-weight: 600; }
+    </style>
+</head>
+<body class="bg-gray-50" x-data="matchesApp()" x-init="init()">
+    <!-- Header -->
+    <header class="gradient-bg shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-search text-4xl text-white"></i>
+                    <div>
+                        <h1 class="text-3xl font-bold text-white">نتایج Matching</h1>
+                        <p class="text-white/80 text-sm mt-1">پیام‌هایی که حاوی کلمات لغت‌نامه هستند</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="/" class="text-white hover:text-white/80 transition flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/10">
+                        <i class="fas fa-home"></i>
+                        <span class="font-medium">خانه</span>
+                    </a>
+                    <a href="/analytics" class="text-white hover:text-white/80 transition flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/10">
+                        <i class="fas fa-chart-line"></i>
+                        <span class="font-medium">آنالیتیکس</span>
+                    </a>
+                    <div class="text-white text-right border-r border-white/20 pr-4">
+                        <div class="text-2xl font-bold" x-text="stats.matched_messages"></div>
+                        <div class="text-sm opacity-80">پیام یافت شده</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Filters -->
+    <div class="container mx-auto px-4 py-6">
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">
+                <i class="fas fa-filter ml-2"></i>
+                فیلترها
+            </h2>
+            <div class="grid md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">لغت‌نامه</label>
+                    <select x-model="selectedDict" @change="loadMatches()" class="w-full border rounded-lg p-2">
+                        <option value="">همه لغت‌نامه‌ها</option>
+                        <template x-for="dict in dictionaries" :key="dict.id">
+                            <option :value="dict.id" x-text="dict.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">کلمه</label>
+                    <input type="text"
+                           x-model="searchWord"
+                           @input="loadMatches()"
+                           placeholder="جستجو در کلمات..."
+                           class="w-full border rounded-lg p-2">
+                </div>
+                <div class="flex items-end">
+                    <button @click="loadMatches()" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition">
+                        <i class="fas fa-sync ml-2"></i>
+                        به‌روزرسانی
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-gray-500 text-sm">کل پیام‌ها</div>
+                <div class="text-2xl font-bold text-blue-600" x-text="stats.total_messages"></div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-gray-500 text-sm">پیام‌های دارای match</div>
+                <div class="text-2xl font-bold text-green-600" x-text="stats.matched_messages"></div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-gray-500 text-sm">کل matchها</div>
+                <div class="text-2xl font-bold text-purple-600" x-text="stats.total_matches"></div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-gray-500 text-sm">کلمات منحصر به فرد</div>
+                <div class="text-2xl font-bold text-orange-600" x-text="stats.unique_words"></div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-bold mb-4">
+                <i class="fas fa-list ml-2"></i>
+                نتایج (<span x-text="matches.length"></span> پیام)
+            </h2>
+
+            <div x-show="loading" class="text-center py-12">
+                <i class="fas fa-spinner fa-spin text-4xl text-gray-400"></i>
+                <p class="text-gray-500 mt-4">در حال بارگذاری...</p>
+            </div>
+
+            <div x-show="!loading && matches.length === 0" class="text-center py-12">
+                <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500">هیچ نتیجه‌ای یافت نشد</p>
+            </div>
+
+            <div x-show="!loading && matches.length > 0" class="space-y-4">
+                <template x-for="match in matches" :key="match.message_id">
+                    <div class="border rounded-lg p-4 hover:shadow-md transition">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-sm font-medium text-gray-700" x-text="match.channel_name"></span>
+                                    <span class="text-xs text-gray-400" x-text="new Date(match.created_at).toLocaleDateString('fa-IR')"></span>
+                                </div>
+                                <div class="text-gray-800" x-html="highlightWords(match.text, match.words)"></div>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <template x-for="word in match.words" :key="word.id">
+                                <span class="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">
+                                    <i class="fas fa-tag text-xs"></i>
+                                    <span x-text="word.word"></span>
+                                    <template x-if="word.extra_data && word.extra_data.company_name">
+                                        <span class="text-xs text-purple-500" x-text="'(' + word.extra_data.company_name + ')'"></span>
+                                    </template>
+                                </span>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Pagination -->
+            <div x-show="!loading && matches.length > 0" class="mt-6 flex justify-center items-center gap-2">
+                <button @click="page--" :disabled="page === 1" class="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-angle-right"></i>
+                </button>
+                <span class="px-4 py-2">صفحه <span x-text="page"></span> از <span x-text="totalPages"></span></span>
+                <button @click="page++" :disabled="page >= totalPages" class="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-angle-left"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function matchesApp() {
+            return {
+                dictionaries: [],
+                matches: [],
+                stats: {
+                    total_messages: 0,
+                    matched_messages: 0,
+                    total_matches: 0,
+                    unique_words: 0
+                },
+                selectedDict: '',
+                searchWord: '',
+                page: 1,
+                pageSize: 20,
+                totalPages: 1,
+                loading: false,
+
+                async init() {
+                    await this.loadDictionaries();
+                    await this.loadStats();
+                    await this.loadMatches();
+                },
+
+                async loadDictionaries() {
+                    try {
+                        const res = await fetch('/api/dictionary/dictionaries');
+                        this.dictionaries = await res.json();
+                    } catch (e) {
+                        console.error('Error loading dictionaries:', e);
+                    }
+                },
+
+                async loadStats() {
+                    try {
+                        const res = await fetch('/api/dictionary/matches/stats');
+                        if (res.ok) {
+                            this.stats = await res.json();
+                        }
+                    } catch (e) {
+                        console.error('Error loading stats:', e);
+                    }
+                },
+
+                async loadMatches() {
+                    this.loading = true;
+                    try {
+                        let url = `/api/dictionary/matches?page=${this.page}&page_size=${this.pageSize}`;
+                        if (this.selectedDict) url += `&dictionary_id=${this.selectedDict}`;
+                        if (this.searchWord) url += `&word=${encodeURIComponent(this.searchWord)}`;
+
+                        const res = await fetch(url);
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.matches = data.items || [];
+                            this.totalPages = data.total_pages || 1;
+                        }
+                    } catch (e) {
+                        console.error('Error loading matches:', e);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                highlightWords(text, words) {
+                    if (!text || !words || words.length === 0) return text;
+
+                    let highlighted = text;
+                    words.forEach(word => {
+                        const regex = new RegExp(`(${word.word})`, 'gi');
+                        highlighted = highlighted.replace(regex, '<span class="highlight">$1</span>');
+                    });
+
+                    return highlighted;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

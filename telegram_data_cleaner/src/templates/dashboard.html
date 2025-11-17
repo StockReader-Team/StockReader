@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>داشبورد مدیریت داده‌های تلگرام</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap');
+        * { font-family: 'Vazirmatn', sans-serif; }
+        .active-tab { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); transition: all 0.3s; }
+        .card:hover { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); transform: translateY(-2px); }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0.5rem 1.5rem; border-radius: 8px; transition: all 0.3s; border: none; cursor: pointer; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3); }
+        .btn-danger { background: #ef4444; color: white; padding: 0.5rem 1rem; border-radius: 8px; border: none; cursor: pointer; }
+        .btn-success { background: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 8px; border: none; cursor: pointer; }
+        .stat-card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+        input, select, textarea { border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.5rem 1rem; width: 100%; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; ring: 2px; ring-color: rgba(102, 126, 234, 0.3); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f9fafb; padding: 0.75rem; text-align: right; font-weight: 600; }
+        td { padding: 0.75rem; border-top: 1px solid #e5e7eb; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+    </style>
+</head>
+<body class="bg-gray-50" x-data="dashboardApp()" x-init="init()">
+    <!-- Header -->
+    <header class="gradient-bg shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-chart-line text-3xl text-white"></i>
+                    <h1 class="text-2xl font-bold text-white">داشبورد مدیریت داده‌های تلگرام</h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="/" class="text-white hover:text-white/80 transition flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/10">
+                        <i class="fas fa-home"></i>
+                        <span class="font-medium">خانه</span>
+                    </a>
+                    <a href="/matches" class="text-white hover:text-white/80 transition flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/10">
+                        <i class="fas fa-check-circle"></i>
+                        <span class="font-medium">تطابق‌ها</span>
+                    </a>
+                    <a href="/analytics" class="text-white hover:text-white/80 transition flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/10">
+                        <i class="fas fa-chart-line"></i>
+                        <span class="font-medium">آنالیتیکس</span>
+                    </a>
+                    <button @click="refreshAll()" class="text-white hover:bg-white/20 px-4 py-2 rounded-lg transition">
+                        <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i> بروزرسانی
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="container mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">کل پیام‌ها</p>
+                        <h3 class="text-2xl font-bold mt-1" x-text="stats.messages?.total || 0"></h3>
+                    </div>
+                    <div class="stat-icon bg-blue-100"><i class="fas fa-envelope text-blue-600 text-xl"></i></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">لغت‌نامه‌ها</p>
+                        <h3 class="text-2xl font-bold mt-1" x-text="dictionaries.length"></h3>
+                    </div>
+                    <div class="stat-icon bg-green-100"><i class="fas fa-book text-green-600 text-xl"></i></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">کلمات</p>
+                        <h3 class="text-2xl font-bold mt-1" x-text="stats.dictionaries?.total_words || 0"></h3>
+                    </div>
+                    <div class="stat-icon bg-purple-100"><i class="fas fa-tags text-purple-600 text-xl"></i></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">تطابق‌ها</p>
+                        <h3 class="text-2xl font-bold mt-1" x-text="stats.dictionaries?.total_matches || 0"></h3>
+                    </div>
+                    <div class="stat-icon bg-orange-100"><i class="fas fa-link text-orange-600 text-xl"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="container mx-auto px-4">
+        <div class="bg-white rounded-lg shadow p-2 flex gap-2 overflow-x-auto">
+            <button @click="currentTab = 'overview'" :class="currentTab === 'overview' ? 'active-tab' : 'hover:bg-gray-100'" class="px-6 py-3 rounded-lg font-medium transition whitespace-nowrap">
+                <i class="fas fa-home ml-2"></i> خانه
+            </button>
+            <button @click="currentTab = 'dictionaries'; loadDictionaries()" :class="currentTab === 'dictionaries' ? 'active-tab' : 'hover:bg-gray-100'" class="px-6 py-3 rounded-lg font-medium transition whitespace-nowrap">
+                <i class="fas fa-book ml-2"></i> لغت‌نامه‌ها
+            </button>
+            <button @click="currentTab = 'words'; loadWordsTab()" :class="currentTab === 'words' ? 'active-tab' : 'hover:bg-gray-100'" class="px-6 py-3 rounded-lg font-medium transition whitespace-nowrap">
+                <i class="fas fa-plus-circle ml-2"></i> افزودن نماد
+            </button>
+            <button @click="currentTab = 'import'" :class="currentTab === 'import' ? 'active-tab' : 'hover:bg-gray-100'" class="px-6 py-3 rounded-lg font-medium transition whitespace-nowrap">
+                <i class="fas fa-file-import ml-2"></i> Import Excel
+            </button>
+            <button @click="currentTab = 'messages'; loadMessages()" :class="currentTab === 'messages' ? 'active-tab' : 'hover:bg-gray-100'" class="px-6 py-3 rounded-lg font-medium transition whitespace-nowrap">
+                <i class="fas fa-comments ml-2"></i> پیام‌ها
+            </button>
+        </div>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="container mx-auto px-4 py-6">
+        <!-- Overview Tab -->
+        <div x-show="currentTab === 'overview'" class="space-y-6">
+            <div class="card p-6">
+                <h2 class="text-xl font-bold mb-4"><i class="fas fa-chart-bar ml-2"></i> خوش آمدید!</h2>
+                <p class="text-gray-600 mb-4">از این داشبورد می‌توانید لغت‌نامه‌های خود را مدیریت کنید، نمادهای بورسی اضافه کنید و پیام‌ها را مشاهده کنید.</p>
+                <div class="grid md:grid-cols-2 gap-4 mt-6">
+                    <div class="border-r-4 border-blue-500 bg-blue-50 p-4 rounded">
+                        <h3 class="font-bold text-blue-900 mb-2"><i class="fas fa-lightbulb ml-2"></i> شروع سریع</h3>
+                        <ol class="text-sm text-gray-700 space-y-1 list-decimal list-inside">
+                            <li>ابتدا یک لغت‌نامه بسازید</li>
+                            <li>دسته‌بندی‌های مورد نیاز را اضافه کنید</li>
+                            <li>نمادها را از طریق فرم یا Excel وارد کنید</li>
+                            <li>پیام‌ها به صورت خودکار تجزیه می‌شوند</li>
+                        </ol>
+                    </div>
+                    <div class="border-r-4 border-green-500 bg-green-50 p-4 rounded">
+                        <h3 class="font-bold text-green-900 mb-2"><i class="fas fa-info-circle ml-2"></i> اطلاعات مفید</h3>
+                        <ul class="text-sm text-gray-700 space-y-1">
+                            <li><i class="fas fa-check text-green-600 ml-2"></i>سیستم هر 3 دقیقه پیام‌های جدید را دریافت می‌کند</li>
+                            <li><i class="fas fa-check text-green-600 ml-2"></i>تطابق کلمات به صورت خودکار انجام می‌شود</li>
+                            <li><i class="fas fa-check text-green-600 ml-2"></i>می‌توانید اطلاعات کامل شرکت‌ها را ذخیره کنید</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dictionaries Tab -->
+        <div x-show="currentTab === 'dictionaries'" class="space-y-6">
+            <div class="card p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold"><i class="fas fa-book ml-2"></i> مدیریت لغت‌نامه‌ها</h2>
+                    <button @click="showNewDictModal = true" class="btn-primary">
+                        <i class="fas fa-plus ml-2"></i> لغت‌نامه جدید
+                    </button>
+                </div>
+
+                <div x-show="dictionaries.length === 0" class="text-center py-12 text-gray-500">
+                    <i class="fas fa-book text-6xl mb-4"></i>
+                    <p>هنوز لغت‌نامه‌ای ندارید. روی دکمه "لغت‌نامه جدید" کلیک کنید.</p>
+                </div>
+
+                <div x-show="dictionaries.length > 0" class="space-y-4">
+                    <template x-for="dict in dictionaries" :key="dict.id">
+                        <div class="border rounded-lg p-4 hover:shadow-md transition">
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1">
+                                    <h3 class="font-bold text-lg" x-text="dict.name"></h3>
+                                    <p class="text-gray-600 text-sm mt-1" x-text="dict.description"></p>
+                                    <div class="mt-2">
+                                        <span class="inline-block px-2 py-1 bg-gray-100 rounded text-xs" x-show="dict.is_active">
+                                            <i class="fas fa-check-circle text-green-600"></i> فعال
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button @click="viewCategories(dict)" class="btn-success text-sm">
+                                        <i class="fas fa-folder ml-1"></i> دسته‌ها
+                                    </button>
+                                    <button @click="deleteDictionary(dict.id)" class="btn-danger text-sm">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Categories Section (shown when a dictionary is selected) -->
+            <div x-show="selectedDict" class="card p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <button @click="selectedDict = null" class="text-gray-500 hover:text-gray-700 mb-2">
+                            <i class="fas fa-arrow-right ml-1"></i> بازگشت
+                        </button>
+                        <h2 class="text-xl font-bold">
+                            <i class="fas fa-folder ml-2"></i>
+                            دسته‌بندی‌های <span x-text="selectedDict?.name"></span>
+                        </h2>
+                    </div>
+                    <button @click="showNewCategoryModal = true" class="btn-primary">
+                        <i class="fas fa-plus ml-2"></i> دسته جدید
+                    </button>
+                </div>
+
+                <div x-show="categories.length === 0" class="text-center py-8 text-gray-500">
+                    <p>هنوز دسته‌بندی‌ای ندارید.</p>
+                </div>
+
+                <div x-show="categories.length > 0">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>نام</th>
+                                <th>توضیحات</th>
+                                <th>عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="cat in categories" :key="cat.id">
+                                <tr>
+                                    <td x-text="cat.name"></td>
+                                    <td x-text="cat.description || '-'"></td>
+                                    <td>
+                                        <button @click="deleteCategory(cat.id)" class="text-red-600 hover:text-red-800">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Words Tab -->
+        <div x-show="currentTab === 'words'" class="space-y-6">
+            <div class="card p-6">
+                <h2 class="text-xl font-bold mb-6"><i class="fas fa-plus-circle ml-2"></i> افزودن نماد جدید</h2>
+
+                <form @submit.prevent="createWord()" class="space-y-4">
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">دسته‌بندی *</label>
+                            <select x-model="newWord.category_id" required>
+                                <option value="">انتخاب کنید...</option>
+                                <template x-for="cat in allCategories" :key="cat.id">
+                                    <option :value="cat.id" x-text="`${cat.dictionary_name} > ${cat.name}`"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">نماد *</label>
+                            <input type="text" x-model="newWord.word" placeholder="مثال: فولاد" required>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-bold mb-3">اطلاعات اضافی (اختیاری)</h3>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm mb-2">نام شرکت</label>
+                                <input type="text" x-model="newWord.company_name" placeholder="مثال: فولاد مبارکه اصفهان">
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-2">نام صنعت</label>
+                                <input type="text" x-model="newWord.industry_name" placeholder="مثال: فلزات اساسی">
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-2">کد شرکت</label>
+                                <input type="text" x-model="newWord.company_code" placeholder="مثال: IRO1FOLD0001">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-3">
+                        <button type="button" @click="resetWordForm()" class="px-4 py-2 border rounded-lg">پاک کردن</button>
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-save ml-2"></i> ذخیره
+                        </button>
+                    </div>
+                </form>
+
+                <div x-show="wordCreateSuccess" class="mt-4 p-4 bg-green-100 text-green-800 rounded-lg">
+                    ✓ نماد با موفقیت اضافه شد!
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Tab -->
+        <div x-show="currentTab === 'import'" class="space-y-6">
+            <div class="card p-6">
+                <h2 class="text-xl font-bold mb-4"><i class="fas fa-file-import ml-2"></i> Import از Excel/CSV</h2>
+                <div class="bg-blue-50 border-r-4 border-blue-500 p-4 rounded mb-6">
+                    <h3 class="font-bold text-blue-900 mb-2">فرمت فایل:</h3>
+                    <p class="text-sm text-gray-700 mb-2">فایل Excel یا CSV شما باید دارای ستون‌های زیر باشد:</p>
+                    <ul class="text-sm text-gray-700 list-disc list-inside">
+                        <li><strong>word:</strong> نام نماد (الزامی)</li>
+                        <li><strong>company_name:</strong> نام شرکت (اختیاری)</li>
+                        <li><strong>industry_name:</strong> نام صنعت (اختیاری)</li>
+                        <li><strong>company_code:</strong> کد شرکت (اختیاری)</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">دسته‌بندی *</label>
+                        <select x-model="importCategoryId">
+                            <option value="">انتخاب کنید...</option>
+                            <template x-for="cat in allCategories" :key="cat.id">
+                                <option :value="cat.id" x-text="`${cat.dictionary_name} > ${cat.name}`"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="border-2 border-dashed rounded-lg p-8 text-center">
+                        <input type="file" @change="handleFileUpload($event)" accept=".csv,.xlsx,.xls" class="hidden" id="fileInput">
+                        <label for="fileInput" class="cursor-pointer">
+                            <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
+                            <p class="text-gray-600">فایل Excel یا CSV را اینجا بکشید یا کلیک کنید</p>
+                            <p class="text-sm text-gray-500 mt-2">فرمت‌های پشتیبانی شده: .csv, .xlsx, .xls</p>
+                        </label>
+                    </div>
+
+                    <div x-show="importFile" class="bg-gray-50 p-4 rounded">
+                        <p class="font-medium">فایل انتخاب شده: <span x-text="importFile?.name"></span></p>
+                        <button @click="processImport()" :disabled="!importCategoryId" class="btn-primary mt-3">
+                            <i class="fas fa-upload ml-2"></i> آپلود و Import
+                        </button>
+                    </div>
+
+                    <div x-show="importResult" class="mt-4 p-4 rounded-lg" :class="importResult?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+                        <p x-text="importResult?.message"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages Tab -->
+        <div x-show="currentTab === 'messages'" class="space-y-6">
+            <div class="card p-6">
+                <h2 class="text-xl font-bold mb-4"><i class="fas fa-comments ml-2"></i> پیام‌های دریافتی</h2>
+
+                <div class="mb-4 flex gap-3">
+                    <input type="text" x-model="messageSearch" @input="loadMessages()" placeholder="جستجو در پیام‌ها..." class="flex-1">
+                    <button @click="loadMessages()" class="btn-primary">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+
+                <div x-show="messages.length === 0" class="text-center py-12 text-gray-500">
+                    <i class="fas fa-inbox text-6xl mb-4"></i>
+                    <p>پیامی یافت نشد</p>
+                </div>
+
+                <div x-show="messages.length > 0" class="space-y-3">
+                    <template x-for="msg in messages" :key="msg.message_id">
+                        <div class="border rounded-lg p-4 hover:shadow-md transition">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-medium text-blue-600" x-text="msg.channel_title"></span>
+                                <span class="text-sm text-gray-500" x-text="new Date(msg.date).toLocaleString('fa-IR')"></span>
+                            </div>
+                            <p class="text-gray-700 text-sm" x-text="msg.text?.substring(0, 200) + (msg.text?.length > 200 ? '...' : '')"></p>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="mt-4 flex justify-center gap-2">
+                    <button @click="messagePage--; loadMessages()" :disabled="messagePage === 0" class="px-4 py-2 border rounded disabled:opacity-50">
+                        قبلی
+                    </button>
+                    <span class="px-4 py-2">صفحه <span x-text="messagePage + 1"></span></span>
+                    <button @click="messagePage++; loadMessages()" class="px-4 py-2 border rounded">
+                        بعدی
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Dictionary Modal -->
+    <div class="modal" :class="{'active': showNewDictModal}">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">لغت‌نامه جدید</h3>
+            <form @submit.prevent="createDictionary()">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">نام *</label>
+                        <input type="text" x-model="newDict.name" required placeholder="مثال: بورس اوراق بهادار">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">توضیحات</label>
+                        <textarea x-model="newDict.description" rows="3" placeholder="توضیحات اختیاری..."></textarea>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" @click="showNewDictModal = false" class="px-4 py-2 border rounded">انصراف</button>
+                    <button type="submit" class="btn-primary">ایجاد</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- New Category Modal -->
+    <div class="modal" :class="{'active': showNewCategoryModal}">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">دسته‌بندی جدید</h3>
+            <form @submit.prevent="createCategory()">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">نام *</label>
+                        <input type="text" x-model="newCategory.name" required placeholder="مثال: نمادها">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">توضیحات</label>
+                        <textarea x-model="newCategory.description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" @click="showNewCategoryModal = false" class="px-4 py-2 border rounded">انصراف</button>
+                    <button type="submit" class="btn-primary">ایجاد</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function dashboardApp() {
+            return {
+                currentTab: 'overview',
+                loading: false,
+                stats: { messages: {}, dictionaries: {} },
+                dictionaries: [],
+                categories: [],
+                allCategories: [],
+                messages: [],
+                messagePage: 0,
+                messageSearch: '',
+
+                // Modals
+                showNewDictModal: false,
+                showNewCategoryModal: false,
+                selectedDict: null,
+
+                // Forms
+                newDict: { name: '', description: '', is_active: true },
+                newCategory: { name: '', description: '' },
+                newWord: { category_id: '', word: '', company_name: '', industry_name: '', company_code: '' },
+                wordCreateSuccess: false,
+
+                // Import
+                importCategoryId: '',
+                importFile: null,
+                importResult: null,
+
+                async init() {
+                    await this.refreshAll();
+                },
+
+                async refreshAll() {
+                    this.loading = true;
+                    try {
+                        await Promise.all([
+                            this.loadStats(),
+                            this.loadDictionaries(),
+                            this.loadAllCategories()
+                        ]);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async loadStats() {
+                    try {
+                        const [msgRes, dictRes] = await Promise.all([
+                            fetch('/api/messages/stats'),
+                            fetch('/api/dictionary/stats')
+                        ]);
+                        if (msgRes.ok) this.stats.messages = await msgRes.json();
+                        if (dictRes.ok) this.stats.dictionaries = await dictRes.json();
+                    } catch (e) {
+                        console.error('Error loading stats:', e);
+                    }
+                },
+
+                async loadDictionaries() {
+                    try {
+                        const res = await fetch('/api/dictionary/dictionaries');
+                        if (res.ok) this.dictionaries = await res.json();
+                    } catch (e) {
+                        console.error('Error loading dictionaries:', e);
+                    }
+                },
+
+                async loadAllCategories() {
+                    try {
+                        const res = await fetch('/api/dictionary/categories');
+                        if (res.ok) {
+                            const cats = await res.json();
+                            // Enrich with dictionary name
+                            for (let cat of cats) {
+                                const dict = this.dictionaries.find(d => d.id === cat.dictionary_id);
+                                cat.dictionary_name = dict?.name || 'نامشخص';
+                            }
+                            this.allCategories = cats;
+                        }
+                    } catch (e) {
+                        console.error('Error loading categories:', e);
+                    }
+                },
+
+                async createDictionary() {
+                    try {
+                        const res = await fetch('/api/dictionary/dictionaries', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.newDict)
+                        });
+                        if (res.ok) {
+                            await this.loadDictionaries();
+                            this.showNewDictModal = false;
+                            this.newDict = { name: '', description: '', is_active: true };
+                        }
+                    } catch (e) {
+                        alert('خطا در ایجاد لغت‌نامه');
+                    }
+                },
+
+                async deleteDictionary(id) {
+                    if (!confirm('آیا مطمئن هستید؟')) return;
+                    try {
+                        await fetch(`/api/dictionary/dictionaries/${id}`, { method: 'DELETE' });
+                        await this.loadDictionaries();
+                    } catch (e) {
+                        alert('خطا در حذف');
+                    }
+                },
+
+                async viewCategories(dict) {
+                    this.selectedDict = dict;
+                    try {
+                        const res = await fetch(`/api/dictionary/categories?dictionary_id=${dict.id}`);
+                        if (res.ok) this.categories = await res.json();
+                    } catch (e) {
+                        console.error('Error loading categories:', e);
+                    }
+                },
+
+                async createCategory() {
+                    try {
+                        const res = await fetch('/api/dictionary/categories', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ...this.newCategory,
+                                dictionary_id: this.selectedDict.id
+                            })
+                        });
+                        if (res.ok) {
+                            await this.viewCategories(this.selectedDict);
+                            await this.loadAllCategories();
+                            this.showNewCategoryModal = false;
+                            this.newCategory = { name: '', description: '' };
+                        }
+                    } catch (e) {
+                        alert('خطا در ایجاد دسته');
+                    }
+                },
+
+                async deleteCategory(id) {
+                    if (!confirm('آیا مطمئن هستید؟')) return;
+                    try {
+                        await fetch(`/api/dictionary/categories/${id}`, { method: 'DELETE' });
+                        await this.viewCategories(this.selectedDict);
+                        await this.loadAllCategories();
+                    } catch (e) {
+                        alert('خطا در حذف');
+                    }
+                },
+
+                async loadWordsTab() {
+                    await this.loadAllCategories();
+                },
+
+                async createWord() {
+                    try {
+                        const payload = {
+                            category_id: this.newWord.category_id,
+                            word: this.newWord.word,
+                            is_active: true
+                        };
+
+                        if (this.newWord.company_name || this.newWord.industry_name || this.newWord.company_code) {
+                            payload.extra_data = {
+                                symbol_name: this.newWord.word,
+                                company_name: this.newWord.company_name,
+                                industry_name: this.newWord.industry_name,
+                                company_code: this.newWord.company_code
+                            };
+                        }
+
+                        const res = await fetch('/api/dictionary/words', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (res.ok) {
+                            this.wordCreateSuccess = true;
+                            this.resetWordForm();
+                            setTimeout(() => this.wordCreateSuccess = false, 3000);
+                        }
+                    } catch (e) {
+                        alert('خطا در ایجاد نماد');
+                    }
+                },
+
+                resetWordForm() {
+                    this.newWord = { category_id: '', word: '', company_name: '', industry_name: '', company_code: '' };
+                },
+
+                handleFileUpload(event) {
+                    this.importFile = event.target.files[0];
+                },
+
+                async processImport() {
+                    if (!this.importFile || !this.importCategoryId) {
+                        alert('لطفاً فایل و دسته‌بندی را انتخاب کنید');
+                        return;
+                    }
+
+                    // این قسمت نیاز به پردازش CSV/Excel دارد
+                    // فعلاً یک پیام ساده نمایش می‌دهیم
+                    this.importResult = {
+                        success: false,
+                        message: 'این قابلیت در نسخه بعدی اضافه می‌شود. لطفاً از فرم "افزودن نماد" استفاده کنید.'
+                    };
+                },
+
+                async loadMessages() {
+                    try {
+                        const limit = 20;
+                        const offset = this.messagePage * limit;
+                        const res = await fetch(`/api/messages?limit=${limit}&offset=${offset}`);
+                        if (res.ok) this.messages = await res.json();
+                    } catch (e) {
+                        console.error('Error loading messages:', e);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
