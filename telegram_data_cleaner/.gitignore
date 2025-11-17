@@ -30,7 +30,7 @@ env/
 .venv
 
 # Poetry
-poetry.lock
+#*.lock
 
 # PyCharm
 .idea/
