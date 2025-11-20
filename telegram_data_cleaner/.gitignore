@@ -92,8 +92,18 @@ docker-compose.override.yml
 *.bak
 *.backup
 backup.sql
+*.sql.gz
+backups/
 
 # Temporary files
 tmp/
 temp/
 *.tmp
+
+# Keep example env files but ignore actual .env
+!.env.example
+!.env.production.example
+
+# Docker volumes
+postgres_data/
+redis_data/

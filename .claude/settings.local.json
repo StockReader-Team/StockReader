@@ -24,7 +24,8 @@
       "Bash(psql:*)",
       "Bash(open:*)",
       "Bash(poetry run uvicorn:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
